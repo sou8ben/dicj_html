@@ -850,6 +850,7 @@ function IntakeReadScreen({ mode: mode, onContinue: onContinue, fillKey: fillKey
                         jsx.jsx("option", { children: "澳門居民身份證" }),
                         jsx.jsx("option", { children: "外地僱員身份認別證" }),
                         jsx.jsx("option", { children: "護照" }),
+                        jsx.jsx("option", { children: "下拉項字典配置" }),
                       ],
                     }),
                   }),
@@ -869,7 +870,7 @@ function IntakeReadScreen({ mode: mode, onContinue: onContinue, fillKey: fillKey
                       value: nationality,
                       onChange: (event) => (setNationality(event.target.value), clearInvalid("nationality")),
                       className: invalidFields.includes("nationality") ? "input-error" : "",
-                      children: ["中國", "葡萄牙", "菲律賓", "越南", "澳門", "香港", "台灣"].map((option) =>
+                      children: ["中國",  "澳門", "香港", "台灣","下拉項字典配置"].map((option) =>
                         jsx.jsx("option", { value: option, children: option }, option),
                       ),
                     }),
@@ -1526,6 +1527,7 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
                             jsx.jsx("option", { children: "澳門居民身份證" }),
                             jsx.jsx("option", { children: "外地僱員身份認別證" }),
                             jsx.jsx("option", { children: "護照" }),
+                            jsx.jsx("option", { children: "下拉項字典配置" }),
                           ],
                         }),
                       }),
@@ -1664,6 +1666,7 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
                           "澳門居民身份證",
                           "外地僱員身份認別證",
                           "護照",
+                          "下拉項字典配置",
                         ].map((option) => jsx.jsx("option", { children: option }, option)),
                       }),
                     }),
@@ -1842,7 +1845,7 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
                                   : endDate && !term
                                     ? "term-muted"
                                     : "",
-                              children: ["", "六個月", "一年", "十八個月", "兩年", "其他"].map((option) =>
+                              children: ["", "六個月", "一年", "十八個月", "兩年"].map((option) =>
                                 jsx.jsx("option", { value: option, children: option || "請選擇期限" }, option || "placeholder"),
                               ),
                             }),
@@ -1881,16 +1884,16 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
                     className: "form-section",
                     children: [
                       jsx.jsx("h3", { children: "申請禁入之博彩承批公司" }),
+                      
                       jsx.jsxs("div", {
-                        className: "choice-label",
+                        className: "radio-row",
+                        children: [
+                          jsx.jsxs("b", {
                         children: [
                           "博彩承批公司",
                           jsx.jsx("span", { className: "required-mark", children: "*" }),
                         ],
                       }),
-                      jsx.jsxs("div", {
-                        className: "radio-row",
-                        children: [
                           jsx.jsxs("label", {
                             children: [
                               jsx.jsx("input", {
@@ -2027,7 +2030,6 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
                 jsx.jsx("h3", { children: "上傳證件" }),
                 jsx.jsx(Field, {
                   label: "證件類型",
-                  required: true,
                   children: jsx.jsx(Select, {
                     className: "doc-type",
                     value: docType,
@@ -2035,7 +2037,8 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
                     children: [
                       "澳門居民身份證",
                       "外地僱員身份認別證",
-                      "護照"
+                      "護照",
+                      "下拉項字典配置", 
                     ].map((option) => jsx.jsx("option", { children: option }, option)),
                   }),
                 }),
@@ -2364,6 +2367,7 @@ function ApplicationPreviewScreen({ data: data, documents: documents, photoName:
                     jsx.jsxs("div", {
                       children: [
                         jsx.jsx("span", { children: "輔導服務" }),
+                        
                         jsx.jsx("b", { children: data.counsel }),
                       ],
                     }),
@@ -3036,6 +3040,7 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
                                   }),
                                   jsx.jsx(Field, {
                                     label: "輔導服務",
+                                    required: true,
                                     children: jsx.jsxs(Select, {
                                       value: termsDraft.counsel,
                                       onChange: (event) => updateTermsDraft("counsel", event.target.value),
