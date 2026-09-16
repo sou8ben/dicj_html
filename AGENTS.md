@@ -41,6 +41,7 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 - Within `.form-actions`, place all `.btn-danger` buttons at the far left and all `.btn-primary` buttons at the far right, including buttons inside `.button-row`.
 - Table action-column headers, cells, and button groups stay right-aligned, including the hovered-row state.
 - In the application form, keep 「申請禁入之博彩承批公司」 as an unmarked section title, then show a separate 「博彩承批公司」 field label with a red required asterisk immediately above its radio row; 「輔導服務」 also shows the red required asterisk. Preview and read-only detail labels remain unmarked.
+- Render 「案件流程」 as a read-only connected-dot progress track, not as bordered or filled button-like cards; use color and dot emphasis to distinguish completed, current, future, and void states.
 
 - Use a modern government-professional visual language: deep navy identity, interaction blue, cool neutral page surfaces, restrained shadows, and high-contrast semantic status colors.
 - Treat 14px as the desktop body-text baseline, 28px for page titles, 18px for section titles, 40px for primary controls, 10px for card radius, and an 8px-based spacing rhythm.

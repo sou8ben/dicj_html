@@ -1417,39 +1417,97 @@ input[type="radio"]:focus-visible {
 
 .process-progress {
   display: flex;
-  gap: 8px;
+  align-items: flex-start;
+  gap: 0;
 }
 
 .process-progress li {
+  position: relative;
   min-width: 0;
   flex: 1;
-  padding: 10px 8px;
-  border: 1px solid var(--border-default);
-  border-radius: 7px;
+  padding: 25px 4px 0;
+  border: 0;
+  border-radius: 0;
   color: var(--text-muted);
-  background: #f8fafc;
+  background: transparent;
   text-align: center;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
+  line-height: 1.35;
   white-space: nowrap;
+}
+
+.process-progress li::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  top: 4px;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  border: 2px solid #aebdc7;
+  border-radius: 50%;
+  background: #fff;
+  transform: translateX(-50%);
+}
+
+.process-progress li::after {
+  content: "";
+  position: absolute;
+  top: 9px;
+  right: 50%;
+  width: 100%;
+  height: 2px;
+  background: #d7e0e6;
+}
+
+.process-progress li:first-child::after {
+  content: none;
 }
 
 .process-progress li.done {
   color: var(--success-text);
-  border-color: #b9dbd2;
-  background: #eff9f6;
+  border-color: transparent;
+  background: transparent;
+}
+
+.process-progress li.done::before {
+  border-color: #4f9485;
+  background: #4f9485;
+}
+
+.process-progress li.done::after,
+.process-progress li.current::after {
+  background: #83b9ad;
 }
 
 .process-progress li.current {
-  color: #fff;
+  color: var(--brand-700);
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  font-weight: 700;
+}
+
+.process-progress li.current::before {
+  top: 3px;
+  width: 12px;
+  height: 12px;
   border-color: var(--brand-700);
   background: var(--brand-700);
-  box-shadow: 0 3px 10px rgba(10, 92, 143, 0.16);
+  box-shadow: 0 0 0 4px var(--brand-050);
 }
 
 .process-progress.cancelled li.current {
+  color: var(--danger-text);
+  border-color: transparent;
+  background: transparent;
+}
+
+.process-progress.cancelled li.current::before {
   border-color: #bd3540;
   background: #bd3540;
+  box-shadow: 0 0 0 4px #fff0f1;
 }
 
 .timeline {
@@ -1681,7 +1739,7 @@ input[type="radio"]:focus-visible {
   }
 
   .process-progress {
-    gap: 5px;
+    gap: 0;
   }
 
   .process-progress li {
