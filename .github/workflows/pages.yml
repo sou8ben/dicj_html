@@ -31,7 +31,7 @@ jobs:
           package-manager-cache: false
 
       - name: Build
-        run: npm run build
+        run: node scripts/build.mjs
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v6
