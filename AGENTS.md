@@ -40,6 +40,7 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 
 - Within `.form-actions`, place all `.btn-danger` buttons at the far left and all `.btn-primary` buttons at the far right, including buttons inside `.button-row`.
 - Table action-column headers, cells, and button groups stay right-aligned, including the hovered-row state.
+- In the application form, show the red required asterisk on both 「申請禁入之博彩承批公司」 and 「輔導服務」 labels; preview and read-only detail labels remain unmarked.
 
 - Use a modern government-professional visual language: deep navy identity, interaction blue, cool neutral page surfaces, restrained shadows, and high-contrast semantic status colors.
 - Treat 14px as the desktop body-text baseline, 28px for page titles, 18px for section titles, 40px for primary controls, 10px for card radius, and an 8px-based spacing rhythm.

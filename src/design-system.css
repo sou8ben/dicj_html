@@ -478,6 +478,11 @@ button.sidebar-foot:focus-visible {
   color: var(--danger-text);
 }
 
+.required-mark {
+  margin-left: 3px;
+  color: var(--danger-text);
+}
+
 .field input,
 .field select,
 .field textarea,

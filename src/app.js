@@ -1880,7 +1880,12 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
                   jsx.jsxs("div", {
                     className: "form-section",
                     children: [
-                      jsx.jsx("h3", { children: "申請禁入之博彩承批公司" }),
+                      jsx.jsxs("h3", {
+                        children: [
+                          "申請禁入之博彩承批公司",
+                          jsx.jsx("span", { className: "required-mark", children: "*" }),
+                        ],
+                      }),
                       jsx.jsxs("div", {
                         className: "radio-row",
                         children: [
@@ -1947,7 +1952,12 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
                       jsx.jsxs("div", {
                         className: "inline-question",
                         children: [
-                          jsx.jsx("b", { children: "輔導服務" }),
+                          jsx.jsxs("b", {
+                            children: [
+                              "輔導服務",
+                              jsx.jsx("span", { className: "required-mark", children: "*" }),
+                            ],
+                          }),
                           jsx.jsxs("label", {
                             children: [
                               jsx.jsx("input", {
