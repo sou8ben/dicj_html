@@ -1,7 +1,7 @@
 dist/
 .DS_Store
 
-.claude/
+.claude/*
 .github/
 .openai/
 .wrangler/

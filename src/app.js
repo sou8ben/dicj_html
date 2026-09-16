@@ -27,8 +27,14 @@ const NAV_ITEMS = [
   { label: "帳號管理", id: "accounts", icon: rf },
   { label: "操作日誌", id: "logs", icon: W8 },
 ];
-const APP_VERSION = "2026.09.15 06:47PM";
+const APP_VERSION = "2026.09.16 12:56PM";
 const FRONTEND_CHANGELOG = [
+  {
+    title: "2026.09.16 更新內容",
+    items: [
+      "申請人證件資料新增國籍欄位。", 
+    ],
+  },
   {
     title: "2026.09.15 更新內容",
     items: [
@@ -51,6 +57,7 @@ const FRONTEND_CHANGELOG = [
       "版本號移至左側導覽列底部，點擊可查看本次前端改動。",
     ],
   },
+  
 ];
 
 /* ---- 7.2 工具函數 Utils ---- */
@@ -691,28 +698,30 @@ function IntakeReadScreen({ mode: mode, onContinue: onContinue, fillKey: fillKey
     [isIdRead, setIdRead] = React.useState(false),
     [gender, setGender] = React.useState("男"),
     [birth, setBirth] = React.useState(""),
+    [nationality, setNationality] = React.useState(""),
     [docType, setDocType] = React.useState(""),
     [enName, setEnName] = React.useState(""),
     [invalidFields, setInvalidFields] = React.useState([]),
     selectMethod = (method) => {
-      (setReadMethod(method), setIdRead(true), setEnName("CHAN DAI MAN"), setDocNumber("13888888"), setBirth("1998-08-08"), setDocType("澳門居民身份證"), setInvalidFields([]));
+      (setReadMethod(method), setIdRead(true), setEnName("CHAN DAI MAN"), setDocNumber("13888888"), setBirth("1998-08-08"), setNationality("澳門"), setDocType("澳門居民身份證"), setInvalidFields([]));
     },
     clearInvalid = (key) => setInvalidFields(invalidFields.filter((field) => field !== key)),
     validateAndContinue = () => {
       const missing = [];
       if (!enName.trim()) missing.push("en");
       if (!birth) missing.push("birth");
+      if (!nationality) missing.push("nationality");
       if (!docType) missing.push("docType");
       if (!docNumber.trim()) missing.push("docNo");
       if (missing.length) return setInvalidFields(missing);
-      onContinue({ mode: mode, docNo: docNumber, applicant: { gender: gender, birth: birth, docType: docType } });
+      onContinue({ mode: mode, docNo: docNumber, applicant: { gender: gender, birth: birth, nationality: nationality, docType: docType } });
     };
-  const intakeDirtyKey = JSON.stringify([readMethod, gender, enName, birth, docType, docNumber]),
+  const intakeDirtyKey = JSON.stringify([readMethod, gender, enName, birth, nationality, docType, docNumber]),
     intakeDirtyBaselineRef = React.useRef(null);
   React.useEffect(() => {
     const profile = fillKey > 0 && DemoFillProfiles[fillScenario];
     if (profile) {
-      (setIdRead(true), setGender(profile.gender), setEnName(profile.enName), setBirth(profile.birth), setDocType(profile.docType), setDocNumber(profile.docNo), setInvalidFields([]));
+      (setIdRead(true), setGender(profile.gender), setEnName(profile.enName), setBirth(profile.birth), setNationality(profile.nationality || "澳門"), setDocType(profile.docType), setDocNumber(profile.docNo), setInvalidFields([]));
     }
   }, [fillKey]);
   React.useEffect(() => {
@@ -851,6 +860,18 @@ function IntakeReadScreen({ mode: mode, onContinue: onContinue, fillKey: fillKey
                       value: docNumber,
                       onChange: (event) => (setDocNumber(event.target.value), clearInvalid("docNo")),
                       className: invalidFields.includes("docNo") ? "input-error" : "",
+                    }),
+                  }),
+                  jsx.jsx(Field, {
+                    label: "國籍",
+                    required: true,
+                    children: jsx.jsx(Select, {
+                      value: nationality,
+                      onChange: (event) => (setNationality(event.target.value), clearInvalid("nationality")),
+                      className: invalidFields.includes("nationality") ? "input-error" : "",
+                      children: ["中國", "葡萄牙", "菲律賓", "越南", "澳門", "香港", "台灣"].map((option) =>
+                        jsx.jsx("option", { value: option, children: option }, option),
+                      ),
                     }),
                   }),
                 ],
@@ -4365,7 +4386,7 @@ function OperationLogsScreen() {
   });
 }
 /* ---- 7.3 共用元件 Components：模態視窗 Modal ---- */
-function Modal({ title: title, onClose: onClose, children: children }) {
+function Modal({ title: title, onClose: onClose, children: children, bodyClassName: bodyClassName = "" }) {
   return jsx.jsx("div", {
     className: "modal-backdrop",
     onMouseDown: onClose,
@@ -4384,7 +4405,7 @@ function Modal({ title: title, onClose: onClose, children: children }) {
             }),
           ],
         }),
-        jsx.jsx("div", { className: "modal-body", children: children }),
+        jsx.jsx("div", { className: `modal-body${bodyClassName ? ` ${bodyClassName}` : ""}`, children: children }),
       ],
     }),
   });
@@ -4854,6 +4875,7 @@ function App() {
         jsx.jsx(Modal, {
           title: `版本 ${APP_VERSION} 前端改動`,
           onClose: () => setShowFrontendChanges(false),
+          bodyClassName: "frontend-changelog-scroll",
           children: jsx.jsx("div", {
             className: "frontend-changelog",
             children: FRONTEND_CHANGELOG.map((section) =>
