@@ -483,6 +483,14 @@ button.sidebar-foot:focus-visible {
   color: var(--danger-text);
 }
 
+.choice-label {
+  margin-bottom: 7px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
 .field input,
 .field select,
 .field textarea,

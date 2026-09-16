@@ -1880,9 +1880,11 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
                   jsx.jsxs("div", {
                     className: "form-section",
                     children: [
-                      jsx.jsxs("h3", {
+                      jsx.jsx("h3", { children: "申請禁入之博彩承批公司" }),
+                      jsx.jsxs("div", {
+                        className: "choice-label",
                         children: [
-                          "申請禁入之博彩承批公司",
+                          "博彩承批公司",
                           jsx.jsx("span", { className: "required-mark", children: "*" }),
                         ],
                       }),
