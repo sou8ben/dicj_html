@@ -3022,7 +3022,7 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
                                     }),
                                   }),
                                   jsx.jsx(Field, {
-                                    label: "禁入之承批公司",
+                                    label: "申請禁入之博彩承批公司",
                                     children: jsx.jsx("input", {
                                       value: termsDraft.scope,
                                       onChange: (event) => updateTermsDraft("scope", event.target.value),
@@ -3077,7 +3077,7 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
                               }),
                               jsx.jsxs("div", {
                                 children: [
-                                  jsx.jsx("span", { children: "禁入之承批公司" }),
+                                  jsx.jsx("span", { children: "申請禁入之博彩承批公司" }),
                                   jsx.jsx("b", { children: termsDetails.scope || "—" }),
                                 ],
                               }),
