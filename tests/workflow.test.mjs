@@ -25,15 +25,13 @@ function run(current, actionId, role) {
   }).application;
 }
 
-test("一戶通初檢缺件補交後回到待處理", () => {
+test("一戶通初檢缺件自動發送通知後補交回到待處理", () => {
   let current = application();
   current = run(current, "confirm_missing", ROLES.COUNTER);
-  assert.equal(current.status, "待通知補件");
-  current = run(current, "send_supplement_notice", ROLES.COUNTER);
   assert.equal(current.status, "已通知補件");
   current = run(current, "confirm_supplement_received", ROLES.COUNTER);
   assert.equal(current.status, "待處理");
-  assert.equal(current.history.length, 3);
+  assert.equal(current.history.length, 2);
 });
 
 test("一戶通複核退回在修正通知後重新送複核", () => {

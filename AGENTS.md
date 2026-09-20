@@ -12,7 +12,7 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 
 - Leaving an unfinished application or termination flow requires confirmation only when the flow data has changed (`flowDirty` is set by intake/form edits via the screens' `onDirty` callback and cleared on flow entry, successful submission, logout, role changes, and demo reset); cancelling preserves the current form. Guard navigation, logout, demo reset, role changes that leave the flow, and browser unload. Internal steps, successful submission, and leaving an untouched flow do not prompt.
 
-- Keep the One Account initial-document supplement loop separate from later review returns: `待通知補件 → 已通知補件 → 待處理`, while processor/supervisor returns use `退回 → 待複核` after corrected documents are confirmed.
+- Keep the One Account initial-document supplement loop separate from later review returns: confirming missing documents (`confirm_missing`) sends the supplement notice automatically and moves the case straight to `已通知補件` (no separate visible `待通知補件` status or manual `send_supplement_notice` step), then `已通知補件 → 待處理` once supplemented documents are confirmed received; processor/supervisor returns use `退回 → 待複核` after corrected documents are confirmed.
 - Keep the counter workflow's visible status as `待審批`; use an internal stage to distinguish processor review from supervisor approval instead of adding a visible `待複核` status.
 - RecordCheck 核查禁入紀錄時以「證件類型:證件號碼」為鍵查詢 `DemoData.exclusionHistory`（demo 紀錄均為澳門居民身份證），兩者須同時相符；介面顯示「證件類型：…　證件號碼：…」。續期判定（到期前 30 天內）以本機時間為準，demo 13888888 的到期日為本機日期 + 20 天。
 - 公眾假期資料以「名稱+日期」去重、依日期排序；跨日假期日期存為「開始日 至 結束日」，編輯時僅改開始日（改到 ≥ 結束日則收斂為單日），儲存需有日期且不可與其他列重複。

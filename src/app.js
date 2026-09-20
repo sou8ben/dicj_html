@@ -36,6 +36,11 @@ items: [
 "新增日期驗證，廢止日不得早於生效日。",
 "工作台及申請管理列表新增「申請方」欄位，可顯示並排序「本人／親屬」申請類型。",
 "優化親屬申請案件詳情顯示：清楚區分被申請人與提出申請的親屬資料，並新增顯示親屬身份、與被申請人關係及聯絡資料；本人申請的顯示方式維持不變。",
+"一戶通案件確認缺件後，系統自動發送補件通知並直接進入「已通知補件」，移除「待通知補件」狀態及手動發送通知的操作。",
+"工作台及申請管理列表欄位以「取件方式」取代「通知方式」",
+"表格新增排序功能，點擊欄位標題可依該欄位排序，並顯示排序方向",
+"美化案件流程進度條",
+"移除「待通知補件」狀態；確認缺件後系統會自動發送補件通知並直接進入「已通知補件」，收到補交資料後則返回「待處理」",
 ],
 },
   {
@@ -358,7 +363,6 @@ function ProcessTimeline({ application: application }) {
     stepIndexByStatus = application.source === "一戶通"
       ? {
           待處理: 0,
-          待通知補件: 1,
           已通知補件: 1,
           退回: 1,
           待複核: 2,
@@ -537,7 +541,6 @@ function SearchFilters({ showParty: showParty = true, onSearch: onSearch }) {
           children: [
             jsx.jsx("option", { children: "全部" }),
             jsx.jsx("option", { children: "待處理" }),
-            jsx.jsx("option", { children: "待通知補件" }),
             jsx.jsx("option", { children: "已通知補件" }),
             jsx.jsx("option", { children: "退回" }),
             jsx.jsx("option", { children: "待複核" }),
@@ -565,7 +568,7 @@ function ApplicationsTable({ rows: rows, onOpen: onOpen, actionLabel: actionLabe
           source: (row) => row.source,
           party: (row) => row.party,
           status: (row) => row.status,
-          notify: (row) => row.notify,
+          pickupMethod: (row) => (row.termsDetails && row.termsDetails.pickupMethod) || "親臨",
           time: (row) => row.time,
         }),
       [rows, sort],
@@ -586,7 +589,7 @@ function ApplicationsTable({ rows: rows, onOpen: onOpen, actionLabel: actionLabe
               jsx.jsx(SortableTh, { label: "來源", sortKey: "source", sort: sort, onSort: onSort }),
               jsx.jsx(SortableTh, { label: "申請方", sortKey: "party", sort: sort, onSort: onSort }),
               jsx.jsx(SortableTh, { label: "狀態", sortKey: "status", sort: sort, onSort: onSort }),
-              jsx.jsx(SortableTh, { label: "通知方式", sortKey: "notify", sort: sort, onSort: onSort }),
+              jsx.jsx(SortableTh, { label: "取件方式", sortKey: "pickupMethod", sort: sort, onSort: onSort }),
               jsx.jsx(SortableTh, { label: "申請時間", sortKey: "time", sort: sort, onSort: onSort }),
               jsx.jsx("th", { children: "操作" }),
             ],
@@ -607,7 +610,7 @@ function ApplicationsTable({ rows: rows, onOpen: onOpen, actionLabel: actionLabe
                     jsx.jsx("td", {
                       children: jsx.jsx(Badge, { children: row.status }),
                     }),
-                    jsx.jsx("td", { children: row.notify }),
+                    jsx.jsx("td", { children: (row.termsDetails && row.termsDetails.pickupMethod) || "親臨" }),
                     jsx.jsx("td", { children: row.time }),
                     jsx.jsx("td", {
                       children: jsx.jsx(Button, {
@@ -2738,7 +2741,7 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
     filerDetails = BuildFilerDetails(application),
     canEditApplicant =
       (role === WorkflowRoles.COUNTER || role === WorkflowRoles.ADMIN) &&
-      ["待處理", "待通知補件", "已通知補件", "退回"].includes(application.status),
+      ["待處理", "已通知補件", "退回"].includes(application.status),
     canEditTerms = canEditApplicant,
     updateApplicantDraft = (field, value) =>
       setApplicantDraft({ ...applicantDraft, [field]: value }),

@@ -103,6 +103,7 @@ const DemoData = {
       status: "待處理",
       notify: "電子通知",
       time: "2026-08-26 09:18",
+      termsDetails: { pickupMethod: "電子方式" },
     }),
     makeDemoApplication({
       id: "109/DICJ/2026",
@@ -110,9 +111,10 @@ const DemoData = {
       type: "申請",
       source: "一戶通",
       party: "本人",
-      status: "待通知補件",
+      status: "已通知補件",
       notify: "電子通知",
       time: "2026-08-25 16:42",
+      termsDetails: { pickupMethod: "郵寄" },
     }),
     makeDemoApplication({
       id: "108/DICJ/2026",
@@ -123,6 +125,7 @@ const DemoData = {
       status: "已通知補件",
       notify: "電子通知",
       time: "2026-08-25 11:26",
+      termsDetails: { pickupMethod: "電子方式" },
     }),
     makeDemoApplication({
       id: "107/DICJ/2026",
@@ -133,6 +136,7 @@ const DemoData = {
       status: "待複核",
       notify: "電子通知",
       time: "2026-08-24 14:05",
+      termsDetails: { pickupMethod: "親臨" },
     }),
     makeDemoApplication({
       id: "106/DICJ/2026",
@@ -143,6 +147,7 @@ const DemoData = {
       status: "待審批",
       notify: "電子通知",
       time: "2026-08-23 10:20",
+      termsDetails: { pickupMethod: "電子方式" },
     }),
     makeDemoApplication({
       id: "105/DICJ/2026",
@@ -153,6 +158,7 @@ const DemoData = {
       status: "退回",
       notify: "電子通知",
       time: "2026-08-22 15:36",
+      termsDetails: { pickupMethod: "郵寄" },
     }),
     makeDemoApplication({
       id: "104/DICJ/2026",
@@ -163,6 +169,7 @@ const DemoData = {
       status: "已審批",
       notify: "電子通知",
       time: "2026-08-21 09:42",
+      termsDetails: { pickupMethod: "親臨" },
     }),
     makeDemoApplication({
       id: "103/DICJ/2026",
@@ -174,6 +181,7 @@ const DemoData = {
       flags: { documentsPrinted: true, processingCompleted: true },
       notify: "電子通知",
       time: "2026-08-20 12:12",
+      termsDetails: { pickupMethod: "電子方式" },
     }),
     makeDemoApplication({
       id: "102/DICJ/2026",
@@ -185,6 +193,7 @@ const DemoData = {
       flags: { documentsPrinted: true, processingCompleted: true },
       notify: "電子通知",
       time: "2026-08-19 10:08",
+      termsDetails: { pickupMethod: "郵寄" },
     }),
     makeDemoApplication({
       id: "101/DICJ/2026",

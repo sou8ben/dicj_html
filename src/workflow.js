@@ -20,23 +20,17 @@
 
   const ACTIONS = {
     confirm_missing: {
-      label: "確認缺件",
+      label: "確認缺件並發送通知",
       role: ROLES.COUNTER,
       section: "main",
       variant: "danger",
-      message: "已確認缺件，案件進入補件通知準備階段",
+      message: "已確認缺件，補件通知已自動發送",
     },
     submit_initial_review: {
       label: "完成初審並送複核",
       role: ROLES.COUNTER,
       section: "main",
       message: "初審完成，案件已送交處理人員複核",
-    },
-    send_supplement_notice: {
-      label: "發送補件通知",
-      role: ROLES.COUNTER,
-      section: "notification",
-      message: "補件通知已發送",
     },
     confirm_supplement_received: {
       label: "確認收到補交資料",
@@ -183,8 +177,6 @@
     switch (application.status) {
       case "待處理":
         return ["confirm_missing", "submit_initial_review"];
-      case "待通知補件":
-        return ["send_supplement_notice"];
       case "已通知補件":
         return ["confirm_supplement_received"];
       case "待複核":
@@ -244,7 +236,7 @@
     if (application.status === "完成") return "已完成";
     if (application.status === "作廢") return "已作廢";
     if (application.source === SOURCES.ONLINE) {
-      if (["待處理", "待通知補件", "已通知補件", "退回", "已通知取件"].includes(application.status)) {
+      if (["待處理", "已通知補件", "退回", "已通知取件"].includes(application.status)) {
         return ROLES.COUNTER;
       }
       if (application.status === "待複核") return ROLES.PROCESSOR;
@@ -269,13 +261,10 @@
 
     switch (actionId) {
       case "confirm_missing":
-        next.status = "待通知補件";
+        next.status = "已通知補件";
         break;
       case "submit_initial_review":
         next.status = "待複核";
-        break;
-      case "send_supplement_notice":
-        next.status = "已通知補件";
         break;
       case "confirm_supplement_received":
         next.status = "待處理";
