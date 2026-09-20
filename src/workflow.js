@@ -16,7 +16,7 @@
   };
 
   const TERMINAL_STATUSES = new Set(["完成", "作廢"]);
-  const COUNTER_VOIDABLE_STATUSES = new Set(["待處理", "待審批", "已審批"]);
+  const COUNTER_VOIDABLE_STATUSES = new Set(["待處理", "待審批", "已審批", "退回"]);
 
   const ACTIONS = {
     confirm_missing: {
@@ -106,17 +106,37 @@
       section: "main",
       message: "臨櫃申請表已簽署，案件送交處理人員複核",
     },
+    counter_return_case: {
+      label: "退回案件",
+      role: ROLES.PROCESSOR,
+      section: "main",
+      variant: "danger",
+      message: "案件已退回櫃枱人員跟進修正",
+    },
     counter_complete_review: {
       label: "完成複核並送主管",
       role: ROLES.PROCESSOR,
       section: "main",
       message: "複核完成，案件已轉交主管審批",
     },
+    counter_request_return: {
+      label: "要求退回",
+      role: ROLES.SUPERVISOR,
+      section: "main",
+      variant: "danger",
+      message: "主管已要求退回案件修正",
+    },
     counter_approve_sign: {
       label: "審批通過並雲簽",
       role: ROLES.SUPERVISOR,
       section: "main",
       message: "審批完成，通知書及公函已雲簽",
+    },
+    counter_resubmit_review: {
+      label: "確認補正並重新送複核",
+      role: ROLES.COUNTER,
+      section: "main",
+      message: "補正已確認，案件重新送交複核",
     },
     counter_print_documents: {
       label: "列印通知書／公函",
@@ -194,15 +214,16 @@
 
     if (application.status === "待處理") actionIds.push("counter_submit_review");
     if (application.status === "待審批" && application.stage === "processor_review") {
-      actionIds.push("counter_complete_review");
+      actionIds.push("counter_return_case", "counter_complete_review");
     }
     if (application.status === "待審批" && application.stage === "supervisor_approval") {
-      actionIds.push("counter_approve_sign");
+      actionIds.push("counter_request_return", "counter_approve_sign");
     }
+    if (application.status === "退回") actionIds.push("counter_resubmit_review");
     if (application.status === "已審批") {
       if (!flags.processingCompleted) actionIds.push("complete_processing");
       if (!flags.documentsPrinted) actionIds.push("counter_print_documents");
-      if (flags.documentsPrinted) actionIds.push("counter_record_handover");
+      if (flags.processingCompleted && flags.documentsPrinted) actionIds.push("counter_record_handover");
     }
     if (COUNTER_VOIDABLE_STATUSES.has(application.status)) actionIds.push("void_case");
     return actionIds;
@@ -231,6 +252,7 @@
       if (application.status === "已審批") return `${ROLES.PROCESSOR}／${ROLES.COUNTER}`;
     }
     if (application.status === "待處理") return ROLES.COUNTER;
+    if (application.status === "退回") return ROLES.COUNTER;
     if (application.status === "待審批") {
       return application.stage === "supervisor_approval" ? ROLES.SUPERVISOR : ROLES.PROCESSOR;
     }
@@ -293,8 +315,14 @@
         next.stage = null;
         break;
       case "counter_submit_review":
+      case "counter_resubmit_review":
         next.status = "待審批";
         next.stage = "processor_review";
+        break;
+      case "counter_return_case":
+      case "counter_request_return":
+        next.status = "退回";
+        next.stage = null;
         break;
       case "counter_complete_review":
         next.status = "待審批";

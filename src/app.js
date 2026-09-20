@@ -27,8 +27,17 @@ const NAV_ITEMS = [
   { label: "帳號管理", id: "accounts", icon: rf },
   { label: "操作日誌", id: "logs", icon: W8 },
 ];
-const APP_VERSION = "2026.09.16 12:56PM";
+const APP_VERSION = "2026.09.20 22:56PM";
 const FRONTEND_CHANGELOG = [
+  {
+title: "2026.09.20 更新內容",
+items: [
+"博彩承批公司及輔導服務改為必填欄位，並修正「指定承批公司」錯誤預選的顯示問題。",
+"新增日期驗證，廢止日不得早於生效日。",
+"工作台及申請管理列表新增「申請方」欄位，可顯示並排序「本人／親屬」申請類型。",
+"優化親屬申請案件詳情顯示：清楚區分被申請人與提出申請的親屬資料，並新增顯示親屬身份、與被申請人關係及聯絡資料；本人申請的顯示方式維持不變。",
+],
+},
   {
     title: "2026.09.16 更新內容",
     items: [
@@ -358,9 +367,10 @@ function ProcessTimeline({ application: application }) {
           已通知取件: 5,
           完成: 6,
         }
-      : { 待處理: 0, 待審批: 1, 已審批: 2, 完成: 3, 作廢: 3 },
+      : { 待處理: 0, 待審批: 1, 退回: 1, 已審批: 2, 完成: 3, 作廢: 3 },
     currentStepIndex = stepIndexByStatus[application.status] ?? 0,
-    isCancelled = application.status === "作廢";
+    isCancelled = application.status === "作廢",
+    isReturned = application.status === "退回";
   return jsx.jsxs("div", {
     className: "process-block",
     children: [
@@ -379,7 +389,12 @@ function ProcessTimeline({ application: application }) {
             {
               className: stepIndex < currentStepIndex ? "done" : stepIndex === currentStepIndex ? "current" : "",
               "aria-current": stepIndex === currentStepIndex ? "step" : undefined,
-              children: isCancelled && stepIndex === currentStepIndex ? "作廢" : label,
+              children:
+                stepIndex === currentStepIndex && isCancelled
+                  ? "作廢"
+                  : stepIndex === currentStepIndex && isReturned
+                    ? "退回"
+                    : label,
             },
             label,
           ),
@@ -447,18 +462,40 @@ function Pager({
   });
 }
 /* ---- 7.4 畫面 Screens：申請列表共用（搜尋／表格／卡片）---- */
+const EMPTY_APPLICATION_FILTER = { keyword: "", type: "全部", source: "全部", party: "全部", status: "全部" };
+function filterApplicationRows(rows, criteria) {
+  if (!criteria) return rows;
+  const keyword = (criteria.keyword || "").trim();
+  return rows.filter((row) => {
+    if (keyword && !`${row.name || ""}${row.id || ""}`.includes(keyword)) return false;
+    if (criteria.type && criteria.type !== "全部" && row.type !== criteria.type) return false;
+    if (criteria.source && criteria.source !== "全部" && row.source !== criteria.source) return false;
+    if (criteria.party && criteria.party !== "全部" && row.party !== criteria.party) return false;
+    if (criteria.status && criteria.status !== "全部" && row.status !== criteria.status) return false;
+    return true;
+  });
+}
 function SearchFilters({ showParty: showParty = true, onSearch: onSearch }) {
+  const [draft, setDraft] = React.useState(EMPTY_APPLICATION_FILTER),
+    updateDraft = (field, value) => setDraft({ ...draft, [field]: value }),
+    runSearch = () => onSearch && onSearch(draft);
   return jsx.jsxs("div", {
     className: "filters",
     children: [
       jsx.jsx(Field, {
         label: "關鍵字",
-        children: jsx.jsx("input", { placeholder: "姓名或申請編號" }),
+        children: jsx.jsx("input", {
+          placeholder: "姓名或申請編號",
+          value: draft.keyword,
+          onChange: (event) => updateDraft("keyword", event.target.value),
+          onKeyDown: (event) => event.key === "Enter" && runSearch(),
+        }),
       }),
       jsx.jsx(Field, {
         label: "申請類型",
         children: jsx.jsxs(Select, {
-          value: "全部",
+          value: draft.type,
+          onChange: (event) => updateDraft("type", event.target.value),
           children: [
             jsx.jsx("option", { children: "全部" }),
             jsx.jsx("option", { children: "申請" }),
@@ -470,7 +507,8 @@ function SearchFilters({ showParty: showParty = true, onSearch: onSearch }) {
       jsx.jsx(Field, {
         label: "來源",
         children: jsx.jsxs(Select, {
-          value: "全部",
+          value: draft.source,
+          onChange: (event) => updateDraft("source", event.target.value),
           children: [
             jsx.jsx("option", { children: "全部" }),
             jsx.jsx("option", { children: "一戶通" }),
@@ -482,7 +520,8 @@ function SearchFilters({ showParty: showParty = true, onSearch: onSearch }) {
         jsx.jsx(Field, {
           label: "申請方",
           children: jsx.jsxs(Select, {
-            value: "全部",
+            value: draft.party,
+            onChange: (event) => updateDraft("party", event.target.value),
             children: [
               jsx.jsx("option", { children: "全部" }),
               jsx.jsx("option", { children: "本人" }),
@@ -493,7 +532,8 @@ function SearchFilters({ showParty: showParty = true, onSearch: onSearch }) {
       jsx.jsx(Field, {
         label: "狀態",
         children: jsx.jsxs(Select, {
-          value: "全部",
+          value: draft.status,
+          onChange: (event) => updateDraft("status", event.target.value),
           children: [
             jsx.jsx("option", { children: "全部" }),
             jsx.jsx("option", { children: "待處理" }),
@@ -509,7 +549,7 @@ function SearchFilters({ showParty: showParty = true, onSearch: onSearch }) {
           ],
         }),
       }),
-      jsx.jsx(Button, { onClick: onSearch, icon: Na, children: "查詢" }),
+      jsx.jsx(Button, { onClick: runSearch, icon: Na, children: "查詢" }),
     ],
   });
 }
@@ -523,6 +563,7 @@ function ApplicationsTable({ rows: rows, onOpen: onOpen, actionLabel: actionLabe
           name: (row) => row.name,
           type: (row) => row.type,
           source: (row) => row.source,
+          party: (row) => row.party,
           status: (row) => row.status,
           notify: (row) => row.notify,
           time: (row) => row.time,
@@ -543,6 +584,7 @@ function ApplicationsTable({ rows: rows, onOpen: onOpen, actionLabel: actionLabe
               jsx.jsx(SortableTh, { label: "申請人", sortKey: "name", sort: sort, onSort: onSort }),
               jsx.jsx(SortableTh, { label: "類型", sortKey: "type", sort: sort, onSort: onSort }),
               jsx.jsx(SortableTh, { label: "來源", sortKey: "source", sort: sort, onSort: onSort }),
+              jsx.jsx(SortableTh, { label: "申請方", sortKey: "party", sort: sort, onSort: onSort }),
               jsx.jsx(SortableTh, { label: "狀態", sortKey: "status", sort: sort, onSort: onSort }),
               jsx.jsx(SortableTh, { label: "通知方式", sortKey: "notify", sort: sort, onSort: onSort }),
               jsx.jsx(SortableTh, { label: "申請時間", sortKey: "time", sort: sort, onSort: onSort }),
@@ -561,6 +603,7 @@ function ApplicationsTable({ rows: rows, onOpen: onOpen, actionLabel: actionLabe
                     jsx.jsx("td", { children: row.name }),
                     jsx.jsx("td", { children: row.type }),
                     jsx.jsx("td", { children: row.source }),
+                    jsx.jsx("td", { children: row.party }),
                     jsx.jsx("td", {
                       children: jsx.jsx(Badge, { children: row.status }),
                     }),
@@ -578,7 +621,7 @@ function ApplicationsTable({ rows: rows, onOpen: onOpen, actionLabel: actionLabe
                 row.id,
               ),
             ),
-            rows.length === 0 && jsx.jsx(TableEmptyState, { cols: 8 }),
+            rows.length === 0 && jsx.jsx(TableEmptyState, { cols: 9 }),
           ],
         }),
       ],
@@ -588,8 +631,13 @@ function ApplicationsTable({ rows: rows, onOpen: onOpen, actionLabel: actionLabe
 function DashboardScreen({ applications: applications, onOpen: onOpen, role: role }) {
   const [page, setPage] = React.useState(1),
     [pageSize, setPageSize] = React.useState(10),
+    [filterCriteria, setFilterCriteria] = React.useState(null),
     today = new Date("2026-08-29"),
     actionable = getActionableApplications(applications, role),
+    filteredActionable = React.useMemo(
+      () => filterApplicationRows(actionable, filterCriteria),
+      [actionable, filterCriteria],
+    ),
     overdue = actionable.filter(
       (app) =>
         today.getTime() - new Date(app.time.replace(" ", "T")).getTime() >
@@ -671,16 +719,16 @@ function DashboardScreen({ applications: applications, onOpen: onOpen, role: rol
               ],
             }),
           }),
-          jsx.jsx(SearchFilters, {}),
+          jsx.jsx(SearchFilters, { onSearch: (criteria) => (setFilterCriteria(criteria), setPage(1)) }),
           jsx.jsx(ApplicationsTable, {
-            rows: actionable,
+            rows: filteredActionable,
             onOpen: onOpen,
             actionLabel: "查看處理",
             page: page,
             pageSize: pageSize,
           }),
           jsx.jsx(Pager, {
-            total: actionable.length,
+            total: filteredActionable.length,
             page: page,
             pageSize: pageSize,
             onPageChange: setPage,
@@ -695,15 +743,15 @@ function DashboardScreen({ applications: applications, onOpen: onOpen, role: rol
 function IntakeReadScreen({ mode: mode, onContinue: onContinue, fillKey: fillKey, fillScenario: fillScenario, onDirty: onDirty }) {
   const [readMethod, setReadMethod] = React.useState(""),
     [docNumber, setDocNumber] = React.useState(""),
-    [isIdRead, setIdRead] = React.useState(false),
     [gender, setGender] = React.useState("男"),
     [birth, setBirth] = React.useState(""),
     [nationality, setNationality] = React.useState(""),
     [docType, setDocType] = React.useState(""),
+    [nameZh, setNameZh] = React.useState(""),
     [enName, setEnName] = React.useState(""),
     [invalidFields, setInvalidFields] = React.useState([]),
     selectMethod = (method) => {
-      (setReadMethod(method), setIdRead(true), setEnName("CHAN DAI MAN"), setDocNumber("13888888"), setBirth("1998-08-08"), setNationality("澳門"), setDocType("澳門居民身份證"), setInvalidFields([]));
+      (setReadMethod(method), setNameZh("陳大文"), setEnName("CHAN DAI MAN"), setDocNumber("13888888"), setBirth("1998-08-08"), setNationality("澳門"), setDocType("澳門居民身份證"), setInvalidFields([]));
     },
     clearInvalid = (key) => setInvalidFields(invalidFields.filter((field) => field !== key)),
     validateAndContinue = () => {
@@ -714,14 +762,14 @@ function IntakeReadScreen({ mode: mode, onContinue: onContinue, fillKey: fillKey
       if (!docType) missing.push("docType");
       if (!docNumber.trim()) missing.push("docNo");
       if (missing.length) return setInvalidFields(missing);
-      onContinue({ mode: mode, docNo: docNumber, applicant: { gender: gender, birth: birth, nationality: nationality, docType: docType } });
+      onContinue({ mode: mode, docNo: docNumber, applicant: { name: nameZh.trim(), en: enName.trim(), gender: gender, birth: birth, nationality: nationality, docType: docType } });
     };
-  const intakeDirtyKey = JSON.stringify([readMethod, gender, enName, birth, nationality, docType, docNumber]),
+  const intakeDirtyKey = JSON.stringify([readMethod, gender, nameZh, enName, birth, nationality, docType, docNumber]),
     intakeDirtyBaselineRef = React.useRef(null);
   React.useEffect(() => {
     const profile = fillKey > 0 && DemoFillProfiles[fillScenario];
     if (profile) {
-      (setIdRead(true), setGender(profile.gender), setEnName(profile.enName), setBirth(profile.birth), setNationality(profile.nationality || "澳門"), setDocType(profile.docType), setDocNumber(profile.docNo), setInvalidFields([]));
+      (setGender(profile.gender), setEnName(profile.enName), setBirth(profile.birth), setNationality(profile.nationality || "澳門"), setDocType(profile.docType), setDocNumber(profile.docNo), setInvalidFields([]));
     }
   }, [fillKey]);
   React.useEffect(() => {
@@ -784,7 +832,8 @@ function IntakeReadScreen({ mode: mode, onContinue: onContinue, fillKey: fillKey
                     label: "姓名（中文）",
                     required: false,
                     children: jsx.jsx("input", {
-                      defaultValue: isIdRead ? "陳大文" : "",
+                      value: nameZh,
+                      onChange: (event) => setNameZh(event.target.value),
                       placeholder: "請輸入",
                     }),
                   }),
@@ -1168,6 +1217,7 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
     [endDate, setEndDate] = React.useState(() => (initialDraft && initialDraft.endDate) || ""),
     [termInvalidFields, setTermInvalidFields] = React.useState([]),
     [companies, setCompanies] = React.useState(() => (initialDraft && initialDraft.companies) || []),
+    [referralChannels, setReferralChannels] = React.useState(() => (initialDraft && initialDraft.referralChannels) || ["朋友"]),
     [relativeDocType, setRelativeDocType] = React.useState(() => (initialDraft && initialDraft.relativeDocType) || ""),
     [relativeFiles, setRelativeFiles] = React.useState(() => (initialDraft && initialDraft.relativeFiles) || []),
     [relativeReadMethod, setRelativeReadMethod] = React.useState(() => (initialDraft && initialDraft.relativeReadMethod) || ""),
@@ -1252,8 +1302,8 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
       setStep(4);
     },
     formData = {
-      name: "陳大文",
-      en: "CHAN DAI MAN",
+      name: partyType === "親屬申請" ? relative.name.trim() : (applicant.name || "").trim(),
+      en: partyType === "親屬申請" ? relative.en.trim() : (applicant.en || "").trim(),
       doc: docNo || "",
       party: partyType,
       term: term,
@@ -1266,6 +1316,7 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
       effectiveDate: effectiveDate,
       endDate: endDate,
       companies: companies,
+      referralChannels: referralChannels,
       relative: relative,
     };
   const draftKeyValue = applicant.docType && docNo ? buildDraftKey(applicant.docType, docNo) : null,
@@ -1288,6 +1339,7 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
       effectiveDate: effectiveDate,
       endDate: endDate,
       companies: companies,
+      referralChannels: referralChannels,
       relativeDocType: relativeDocType,
       relativeFiles: relativeFiles,
       relativeReadMethod: relativeReadMethod,
@@ -1321,6 +1373,7 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
       effectiveDate,
       endDate,
       companies,
+      referralChannels,
       relativeDocType,
       relativeFiles,
       relativeReadMethod,
@@ -1744,10 +1797,7 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
             jsx.jsxs("div", {
               className: "form-section",
               children: [
-                jsx.jsx("h3", {
-                  children:
-                    partyType === "親屬申請" ? "被申請人個人資料" : "申請人個人資料",
-                }),
+                jsx.jsx("h3", { children: "申請人個人資料" }),
                 jsx.jsxs("div", {
                   className: "form-grid cols-3",
                   children: [
@@ -1823,7 +1873,8 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
                               onChange: (event) => {
                                 (setEffectiveDate(event.target.value),
                                   term && term !== "其他" && setEndDate(computeTermEndDate(term, event.target.value)),
-                                  clearTermInvalid("effectiveDate"));
+                                  clearTermInvalid("effectiveDate"),
+                                  clearTermInvalid("dateOrder"));
                               },
                               className: termInvalidFields.includes("effectiveDate") ? "input-error" : "",
                             }),
@@ -1864,19 +1915,25 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
                                 (setEndDate(event.target.value),
                                   event.target.value && setTerm(""),
                                   clearTermInvalid("endDate"),
-                                  clearTermInvalid("term"));
+                                  clearTermInvalid("term"),
+                                  clearTermInvalid("dateOrder"));
                               },
                               className: termInvalidFields.includes("endDate") ? "input-error" : "",
                             }),
                           }),
                         ],
                       }),
-                      termInvalidFields.length > 0 &&
+                      (termInvalidFields.includes("effectiveDate") ||
+                        termInvalidFields.includes("dateOrder") ||
+                        termInvalidFields.includes("term") ||
+                        termInvalidFields.includes("endDate")) &&
                         jsx.jsx("div", {
                           className: "field-error",
                           children: termInvalidFields.includes("effectiveDate")
                             ? "請填寫生效日。"
-                            : "請選擇期限或填寫廢止日（二選一）。",
+                            : termInvalidFields.includes("dateOrder")
+                              ? "廢止日不可早於生效日。"
+                              : "請選擇期限或填寫廢止日（二選一）。",
                         }),
                     ],
                   }),
@@ -1884,7 +1941,7 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
                     className: "form-section",
                     children: [
                       jsx.jsx("h3", { children: "申請禁入之博彩承批公司" }),
-                      
+
                       jsx.jsxs("div", {
                         className: "radio-row",
                         children: [
@@ -1899,7 +1956,7 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
                               jsx.jsx("input", {
                                 type: "radio",
                                 checked: scope === "全部",
-                                onChange: () => setScope("全部"),
+                                onChange: () => (setScope("全部"), clearTermInvalid("scope")),
                               }),
                               " 全部",
                             ],
@@ -1908,15 +1965,15 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
                             children: [
                               jsx.jsx("input", {
                                 type: "radio",
-                                checked: scope !== "全部",
-                                onChange: () => setScope("指定承批公司"),
+                                checked: scope === "指定承批公司",
+                                onChange: () => (setScope("指定承批公司"), clearTermInvalid("scope")),
                               }),
                               " 禁入除外的承批公司（可複選）",
                             ],
                           }),
                         ],
                       }),
-                      scope !== "全部" &&
+                      scope === "指定承批公司" &&
                         jsx.jsx("div", {
                           className: "check-grid",
                           children: [
@@ -1935,11 +1992,12 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
                                     type: "checkbox",
                                     checked: companies.includes(option),
                                     onChange: () =>
-                                      setCompanies(
+                                      (setCompanies(
                                         companies.includes(option)
                                           ? companies.filter((item) => item !== option)
                                           : [...companies, option],
                                       ),
+                                      clearTermInvalid("scope")),
                                   }),
                                   option,
                                 ],
@@ -1947,6 +2005,11 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
                               option,
                             ),
                           ),
+                        }),
+                      termInvalidFields.includes("scope") &&
+                        jsx.jsx("div", {
+                          className: "field-error",
+                          children: "請選擇博彩承批公司範圍；選擇「禁入除外的承批公司」時，須至少勾選一間。",
                         }),
                     ],
                   }),
@@ -1969,7 +2032,7 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
                                 type: "radio",
                                 name: "counsel-service",
                                 checked: counsel === "同意",
-                                onChange: () => setCounsel("同意"),
+                                onChange: () => (setCounsel("同意"), clearTermInvalid("counsel")),
                               }),
                               " 同意",
                             ],
@@ -1980,13 +2043,18 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
                                 type: "radio",
                                 name: "counsel-service",
                                 checked: counsel === "不同意",
-                                onChange: () => setCounsel("不同意"),
+                                onChange: () => (setCounsel("不同意"), clearTermInvalid("counsel")),
                               }),
                               " 不同意",
                             ],
                           }),
                         ],
                       }),
+                      termInvalidFields.includes("counsel") &&
+                        jsx.jsx("div", {
+                          className: "field-error",
+                          children: "請選擇是否同意輔導服務。",
+                        }),
                     ],
                   }),
                 ],
@@ -2013,7 +2081,13 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
                         children: [
                           jsx.jsx("input", {
                             type: "checkbox",
-                            defaultChecked: option === "朋友",
+                            checked: referralChannels.includes(option),
+                            onChange: () =>
+                              setReferralChannels(
+                                referralChannels.includes(option)
+                                  ? referralChannels.filter((item) => item !== option)
+                                  : [...referralChannels, option],
+                              ),
                           }),
                           option,
                         ],
@@ -2150,6 +2224,9 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
                       const missing = [];
                       if (!effectiveDate) missing.push("effectiveDate");
                       if (!term && !endDate) missing.push("term", "endDate");
+                      if (effectiveDate && endDate && endDate < effectiveDate) missing.push("dateOrder");
+                      if (!scope || (scope === "指定承批公司" && companies.length === 0)) missing.push("scope");
+                      if (!counsel) missing.push("counsel");
                       if (missing.length) return setTermInvalidFields(missing);
                     }
                     setStep(3);
@@ -2237,25 +2314,25 @@ function ApplicationPreviewScreen({ data: data, documents: documents, photoName:
               jsx.jsxs("div", {
                 children: [
                   jsx.jsx("span", { children: "性別" }),
-                  jsx.jsx("b", { children: data.applicant.gender }),
+                  jsx.jsx("b", { children: data.party === "親屬申請" ? data.relative.gender : data.applicant.gender }),
                 ],
               }),
               jsx.jsxs("div", {
                 children: [
                   jsx.jsx("span", { children: "出生日期" }),
-                  jsx.jsx("b", { children: data.applicant.birth }),
+                  jsx.jsx("b", { children: data.party === "親屬申請" ? data.relative.birth : data.applicant.birth }),
                 ],
               }),
               jsx.jsxs("div", {
                 children: [
                   jsx.jsx("span", { children: "證件類型" }),
-                  jsx.jsx("b", { children: data.applicant.docType || "—" }),
+                  jsx.jsx("b", { children: (data.party === "親屬申請" ? data.relative.docType : data.applicant.docType) || "—" }),
                 ],
               }),
               jsx.jsxs("div", {
                 children: [
                   jsx.jsx("span", { children: "證件號碼" }),
-                  jsx.jsx("b", { children: data.doc || "—" }),
+                  jsx.jsx("b", { children: (data.party === "親屬申請" ? data.relative.docNo : data.doc) || "—" }),
                 ],
               }),
             ],
@@ -2265,9 +2342,7 @@ function ApplicationPreviewScreen({ data: data, documents: documents, photoName:
       jsx.jsxs("div", {
         className: "form-section",
         children: [
-          jsx.jsx("h3", {
-            children: data.party === "親屬申請" ? "被申請人個人資料" : "申請人個人資料",
-          }),
+          jsx.jsx("h3", { children: "申請人個人資料" }),
           jsx.jsxs("div", {
             className: "summary-grid",
             children: [
@@ -2367,8 +2442,14 @@ function ApplicationPreviewScreen({ data: data, documents: documents, photoName:
                     jsx.jsxs("div", {
                       children: [
                         jsx.jsx("span", { children: "輔導服務" }),
-                        
+
                         jsx.jsx("b", { children: data.counsel }),
+                      ],
+                    }),
+                    jsx.jsxs("div", {
+                      children: [
+                        jsx.jsx("span", { children: "知悉禁入申請服務途徑" }),
+                        jsx.jsx("b", { children: data.referralChannels.length ? data.referralChannels.join("、") : "—" }),
                       ],
                     }),
                   ],
@@ -2556,7 +2637,9 @@ function ApplicationPreviewScreen({ data: data, documents: documents, photoName:
 /* ---- 7.4 畫面 Screens：申請管理（列表與詳情）---- */
 function ApplicationsListScreen({ rows: rows, onOpen: onOpen }) {
   const [page, setPage] = React.useState(1),
-    [pageSize, setPageSize] = React.useState(10);
+    [pageSize, setPageSize] = React.useState(10),
+    [filterCriteria, setFilterCriteria] = React.useState(null),
+    filteredRows = React.useMemo(() => filterApplicationRows(rows, filterCriteria), [rows, filterCriteria]);
   return jsx.jsxs(jsx.Fragment, {
     children: [
       jsx.jsx("div", {
@@ -2571,16 +2654,16 @@ function ApplicationsListScreen({ rows: rows, onOpen: onOpen }) {
       jsx.jsxs("section", {
         className: "panel",
         children: [
-          jsx.jsx(SearchFilters, {}),
+          jsx.jsx(SearchFilters, { onSearch: (criteria) => (setFilterCriteria(criteria), setPage(1)) }),
           jsx.jsx(ApplicationsTable, {
-            rows: rows,
+            rows: filteredRows,
             onOpen: onOpen,
             actionLabel: "查看",
             page: page,
             pageSize: pageSize,
           }),
           jsx.jsx(Pager, {
-            total: rows.length,
+            total: filteredRows.length,
             page: page,
             pageSize: pageSize,
             onPageChange: setPage,
@@ -2612,7 +2695,23 @@ function BuildTermsDetails(application) {
     scope: "全部",
     pickupMethod: "親臨",
     counsel: "同意",
+    referralChannels: "",
     ...(application.termsDetails || {}),
+  };
+}
+function BuildFilerDetails(application) {
+  return {
+    name: "",
+    foreignName: "",
+    relation: "",
+    gender: "",
+    birthDate: "",
+    docType: "",
+    docNo: "",
+    phone: "",
+    email: "",
+    address: "",
+    ...(application.filerDetails || {}),
   };
 }
 function ApplicationDetailScreen({ application: application, onBack: onBack, onTransition: onTransition, onUpdateApplicant: onUpdateApplicant, onUpdateTerms: onUpdateTerms, role: role }) {
@@ -2636,6 +2735,7 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
     notificationActions = actions.filter((item) => item.section === "notification"),
     applicantDetails = BuildApplicantDetails(application),
     termsDetails = BuildTermsDetails(application),
+    filerDetails = BuildFilerDetails(application),
     canEditApplicant =
       (role === WorkflowRoles.COUNTER || role === WorkflowRoles.ADMIN) &&
       ["待處理", "待通知補件", "已通知補件", "退回"].includes(application.status),
@@ -2811,7 +2911,7 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
                   jsx.jsxs("div", {
                     className: "section-title",
                     children: [
-                      jsx.jsx("h2", { children: "申請人資料" }),
+                      jsx.jsx("h2", { children: application.party === "親屬" ? "被申請人資料" : "申請人資料" }),
                       canEditApplicant &&
                         !isEditingApplicant &&
                         jsx.jsx(Button, {
@@ -3093,12 +3193,93 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
                                   jsx.jsx("b", { children: termsDetails.counsel || "—" }),
                                 ],
                               }),
+                              jsx.jsxs("div", {
+                                children: [
+                                  jsx.jsx("span", { children: "知悉禁入申請服務途徑" }),
+                                  jsx.jsx("b", { children: termsDetails.referralChannels || "—" }),
+                                ],
+                              }),
                             ],
                           }),
                     ],
                   }),
                 ],
               }),
+              application.party === "親屬" &&
+                jsx.jsxs("section", {
+                  className: "panel",
+                  children: [
+                    jsx.jsx("div", {
+                      className: "section-title",
+                      children: jsx.jsx("h2", { children: "親屬資料" }),
+                    }),
+                    jsx.jsxs("div", {
+                      className: "summary-grid",
+                      children: [
+                        jsx.jsxs("div", {
+                          children: [
+                            jsx.jsx("span", { children: "姓名（中文）" }),
+                            jsx.jsx("b", { children: filerDetails.name || "—" }),
+                          ],
+                        }),
+                        jsx.jsxs("div", {
+                          children: [
+                            jsx.jsx("span", { children: "姓名（外文）" }),
+                            jsx.jsx("b", { children: filerDetails.foreignName || "—" }),
+                          ],
+                        }),
+                        jsx.jsxs("div", {
+                          children: [
+                            jsx.jsx("span", { children: "與被申請人關係" }),
+                            jsx.jsx("b", { children: filerDetails.relation || "—" }),
+                          ],
+                        }),
+                        jsx.jsxs("div", {
+                          children: [
+                            jsx.jsx("span", { children: "性別" }),
+                            jsx.jsx("b", { children: filerDetails.gender || "—" }),
+                          ],
+                        }),
+                        jsx.jsxs("div", {
+                          children: [
+                            jsx.jsx("span", { children: "出生日期" }),
+                            jsx.jsx("b", { children: filerDetails.birthDate || "—" }),
+                          ],
+                        }),
+                        jsx.jsxs("div", {
+                          children: [
+                            jsx.jsx("span", { children: "證件類型" }),
+                            jsx.jsx("b", { children: filerDetails.docType || "—" }),
+                          ],
+                        }),
+                        jsx.jsxs("div", {
+                          children: [
+                            jsx.jsx("span", { children: "證件號碼" }),
+                            jsx.jsx("b", { children: filerDetails.docNo || "—" }),
+                          ],
+                        }),
+                        jsx.jsxs("div", {
+                          children: [
+                            jsx.jsx("span", { children: "聯絡電話" }),
+                            jsx.jsx("b", { children: filerDetails.phone || "—" }),
+                          ],
+                        }),
+                        jsx.jsxs("div", {
+                          children: [
+                            jsx.jsx("span", { children: "電子郵件" }),
+                            jsx.jsx("b", { children: filerDetails.email || "—" }),
+                          ],
+                        }),
+                        jsx.jsxs("div", {
+                          children: [
+                            jsx.jsx("span", { children: "地址" }),
+                            jsx.jsx("b", { children: filerDetails.address || "—" }),
+                          ],
+                        }),
+                      ],
+                    }),
+                  ],
+                }),
               jsx.jsxs("section", {
                 className: "panel",
                 children: [
@@ -3418,9 +3599,15 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
 /* ---- 7.4 畫面 Screens：報表及查詢 ---- */
 function ReportsScreen() {
   const reports = DemoData.reports,
+    [dateFrom, setDateFrom] = React.useState("2026-08-01"),
+    [dateTo, setDateTo] = React.useState("2026-08-27"),
+    [toast, setToast] = React.useState(""),
+    applyDateRange = () => {
+      (setToast(`已套用日期範圍：${dateFrom} 至 ${dateTo}`), setTimeout(() => setToast(""), 2200));
+    },
     downloadReport = (reportName) => {
-      const csvContent = `報表名稱,建立時間
-${reportName},2026-08-27 10:30`,
+      const csvContent = `報表名稱,涵蓋期間,建立時間
+${reportName},${dateFrom} 至 ${dateTo},2026-08-27 10:30`,
         blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv" }),
         link = document.createElement("a");
       ((link.href = URL.createObjectURL(blob)),
@@ -3450,17 +3637,19 @@ ${reportName},2026-08-27 10:30`,
                 label: "日期範圍",
                 children: jsx.jsx("input", {
                   type: "date",
-                  defaultValue: "2026-08-01",
+                  value: dateFrom,
+                  onChange: (event) => setDateFrom(event.target.value),
                 }),
               }),
               jsx.jsx(Field, {
                 label: "至",
                 children: jsx.jsx("input", {
                   type: "date",
-                  defaultValue: "2026-08-27",
+                  value: dateTo,
+                  onChange: (event) => setDateTo(event.target.value),
                 }),
               }),
-              jsx.jsx(Button, { icon: Na, children: "查詢" }),
+              jsx.jsx(Button, { icon: Na, onClick: applyDateRange, children: "查詢" }),
             ],
           }),
           jsx.jsxs("table", {
@@ -3502,21 +3691,40 @@ ${reportName},2026-08-27 10:30`,
           }),
         ],
       }),
+      toast && jsx.jsxs("div", { className: "toast", children: [jsx.jsx(z0, {}), toast] }),
     ],
   });
 }
 /* ---- 7.4 畫面 Screens：行政處罰名單 ---- */
+const EMPTY_SANCTION_FILTER = { name: "", docType: "全部", docNo: "", scope: "" };
+function filterSanctionRows(rows, criteria) {
+  if (!criteria) return rows;
+  const name = (criteria.name || "").trim(),
+    docNo = (criteria.docNo || "").trim(),
+    scope = (criteria.scope || "").trim();
+  return rows.filter((record) => {
+    if (name && !`${record.zh || ""}${record.en || ""}`.includes(name)) return false;
+    if (criteria.docType && criteria.docType !== "全部" && record.doc !== criteria.docType) return false;
+    if (docNo && !(record.no || "").includes(docNo)) return false;
+    if (scope && !(record.scope || "").includes(scope)) return false;
+    return true;
+  });
+}
 function SanctionsScreen() {
   const [rows, setRows] = React.useState(DemoData.sanctions),
-    [isModalOpen, setModalOpen] = React.useState(false),
+    [editing, setEditing] = React.useState(null),
+    [editingInvalid, setEditingInvalid] = React.useState([]),
     [toast, setToast] = React.useState(""),
     [sort, setSort] = React.useState({ key: null, direction: "asc" }),
     [page, setPage] = React.useState(1),
     [pageSize, setPageSize] = React.useState(10),
+    [filterDraft, setFilterDraft] = React.useState(EMPTY_SANCTION_FILTER),
+    [filterCriteria, setFilterCriteria] = React.useState(null),
     onSort = (nextSort) => setSort(nextSort),
+    filteredRows = React.useMemo(() => filterSanctionRows(rows, filterCriteria), [rows, filterCriteria]),
     sortedRows = React.useMemo(
       () =>
-        sortRowsForDisplay(rows, sort, {
+        sortRowsForDisplay(filteredRows, sort, {
           zh: (record) => record.zh,
           en: (record) => record.en,
           doc: (record) => record.doc,
@@ -3525,26 +3733,39 @@ function SanctionsScreen() {
           start: (record) => record.start,
           end: (record) => record.end,
         }),
-      [rows, sort],
+      [filteredRows, sort],
     ),
     totalPages = Math.max(1, Math.ceil(sortedRows.length / pageSize)),
     currentPage = Math.min(Math.max(1, page), totalPages),
     pagedRows = sortedRows.slice((currentPage - 1) * pageSize, currentPage * pageSize),
-    addRecord = () => {
-      (setRows([
-        {
-          zh: "新建紀錄",
-          en: "NEW RECORD",
-          doc: "澳門居民身份證",
-          no: "1000000(0)",
-          scope: "全部",
-          start: "2026-08-27",
-          end: "2027-08-27",
-        },
-        ...rows,
-      ]),
-        setModalOpen(false),
-        setToast("行政處罰紀錄已新增"),
+    openAddModal = () =>
+      (setEditing({ zh: "", en: "", doc: "澳門居民身份證", no: "", scope: "全部", start: "", end: "" }),
+        setEditingInvalid([])),
+    openEditModal = (record, index) => (setEditing({ ...record, index: index }), setEditingInvalid([])),
+    updateEditing = (field, value) => setEditing({ ...editing, [field]: value }),
+    saveRecord = () => {
+      const missing = [];
+      if (!editing.zh.trim()) missing.push("zh");
+      if (!editing.en.trim()) missing.push("en");
+      if (!editing.doc) missing.push("doc");
+      if (!editing.no.trim()) missing.push("no");
+      if (!editing.start) missing.push("start");
+      if (!editing.end) missing.push("end");
+      if (missing.length) return setEditingInvalid(missing);
+      const savedRecord = {
+        zh: editing.zh.trim(),
+        en: editing.en.trim(),
+        doc: editing.doc,
+        no: editing.no.trim(),
+        scope: editing.scope.trim() || "全部",
+        start: editing.start,
+        end: editing.end,
+      };
+      (editing.index === undefined
+        ? setRows([savedRecord, ...rows])
+        : setRows(rows.map((item, index) => (index === editing.index ? savedRecord : item))),
+        setEditing(null),
+        setToast(editing.index === undefined ? "行政處罰紀錄已新增" : "行政處罰紀錄已更新"),
         setTimeout(() => setToast(""), 2200));
     };
   return jsx.jsxs(jsx.Fragment, {
@@ -3570,7 +3791,7 @@ function SanctionsScreen() {
               }),
               jsx.jsx(Button, {
                 icon: Wn,
-                onClick: () => setModalOpen(true),
+                onClick: openAddModal,
                 children: "新增資料",
               }),
             ],
@@ -3583,23 +3804,45 @@ function SanctionsScreen() {
           jsx.jsxs("div", {
             className: "filters",
             children: [
-              jsx.jsx(Field, { label: "姓名", children: jsx.jsx("input", {}) }),
+              jsx.jsx(Field, {
+                label: "姓名",
+                children: jsx.jsx("input", {
+                  value: filterDraft.name,
+                  onChange: (event) => setFilterDraft({ ...filterDraft, name: event.target.value }),
+                }),
+              }),
               jsx.jsx(Field, {
                 label: "證件類型",
-                children: jsx.jsx(Select, {
-                  value: "全部",
-                  children: jsx.jsx("option", { children: "全部" }),
+                children: jsx.jsxs(Select, {
+                  value: filterDraft.docType,
+                  onChange: (event) => setFilterDraft({ ...filterDraft, docType: event.target.value }),
+                  children: [
+                    jsx.jsx("option", { children: "全部" }),
+                    jsx.jsx("option", { children: "澳門居民身份證" }),
+                    jsx.jsx("option", { children: "外地僱員身份認別證" }),
+                    jsx.jsx("option", { children: "護照" }),
+                  ],
                 }),
               }),
-              jsx.jsx(Field, { label: "證件號碼", children: jsx.jsx("input", {}) }),
+              jsx.jsx(Field, {
+                label: "證件號碼",
+                children: jsx.jsx("input", {
+                  value: filterDraft.docNo,
+                  onChange: (event) => setFilterDraft({ ...filterDraft, docNo: event.target.value }),
+                }),
+              }),
               jsx.jsx(Field, {
                 label: "範圍",
-                children: jsx.jsx(Select, {
-                  value: "全部",
-                  children: jsx.jsx("option", { children: "全部" }),
+                children: jsx.jsx("input", {
+                  value: filterDraft.scope,
+                  onChange: (event) => setFilterDraft({ ...filterDraft, scope: event.target.value }),
                 }),
               }),
-              jsx.jsx(Button, { icon: Na, children: "查詢" }),
+              jsx.jsx(Button, {
+                icon: Na,
+                onClick: () => (setFilterCriteria(filterDraft), setPage(1)),
+                children: "查詢",
+              }),
             ],
           }),
           jsx.jsx("div", {
@@ -3639,6 +3882,7 @@ function SanctionsScreen() {
                               children: [
                                 jsx.jsx("button", {
                                   "aria-label": "編輯",
+                                  onClick: () => openEditModal(record, rows.findIndex((item) => item.no === record.no)),
                                   children: jsx.jsx(T0, {}),
                                 }),
                                 jsx.jsx("button", {
@@ -3668,10 +3912,10 @@ function SanctionsScreen() {
           }),
         ],
       }),
-      isModalOpen &&
+      editing &&
         jsx.jsxs(Modal, {
-          title: "新增行政處罰資料",
-          onClose: () => setModalOpen(false),
+          title: editing.index === undefined ? "新增行政處罰資料" : "編輯行政處罰資料",
+          onClose: () => setEditing(null),
           children: [
             jsx.jsxs("div", {
               className: "form-grid",
@@ -3679,35 +3923,70 @@ function SanctionsScreen() {
                 jsx.jsx(Field, {
                   label: "姓名（中文）",
                   required: true,
-                  children: jsx.jsx("input", {}),
+                  children: jsx.jsx("input", {
+                    value: editing.zh,
+                    onChange: (event) => updateEditing("zh", event.target.value),
+                    className: editingInvalid.includes("zh") ? "input-error" : "",
+                  }),
                 }),
                 jsx.jsx(Field, {
                   label: "姓名（外文）",
                   required: true,
-                  children: jsx.jsx("input", {}),
+                  children: jsx.jsx("input", {
+                    value: editing.en,
+                    onChange: (event) => updateEditing("en", event.target.value),
+                    className: editingInvalid.includes("en") ? "input-error" : "",
+                  }),
                 }),
                 jsx.jsx(Field, {
                   label: "證件類型",
                   required: true,
-                  children: jsx.jsx(Select, {
-                    value: "澳門居民身份證",
-                    children: jsx.jsx("option", { children: "澳門居民身份證" }),
+                  children: jsx.jsxs(Select, {
+                    value: editing.doc,
+                    onChange: (event) => updateEditing("doc", event.target.value),
+                    children: [
+                      jsx.jsx("option", { children: "澳門居民身份證" }),
+                      jsx.jsx("option", { children: "外地僱員身份認別證" }),
+                      jsx.jsx("option", { children: "護照" }),
+                    ],
                   }),
                 }),
                 jsx.jsx(Field, {
                   label: "證件號碼",
                   required: true,
-                  children: jsx.jsx("input", {}),
+                  children: jsx.jsx("input", {
+                    value: editing.no,
+                    onChange: (event) => updateEditing("no", event.target.value),
+                    className: editingInvalid.includes("no") ? "input-error" : "",
+                  }),
+                }),
+                jsx.jsx(Field, {
+                  label: "禁入範圍",
+                  children: jsx.jsx("input", {
+                    value: editing.scope,
+                    onChange: (event) => updateEditing("scope", event.target.value),
+                    placeholder: "全部",
+                  }),
                 }),
                 jsx.jsx(Field, {
                   label: "起訖日期",
                   required: true,
-                  children: jsx.jsx("input", { type: "date" }),
+                  children: jsx.jsx("input", {
+                    type: "date",
+                    value: editing.start,
+                    onChange: (event) => updateEditing("start", event.target.value),
+                    className: editingInvalid.includes("start") ? "input-error" : "",
+                  }),
                 }),
                 jsx.jsx(Field, {
                   label: "到期日",
                   required: true,
-                  children: jsx.jsx("input", { type: "date" }),
+                  children: jsx.jsx("input", {
+                    type: "date",
+                    value: editing.end,
+                    onChange: (event) => updateEditing("end", event.target.value),
+                    className: editingInvalid.includes("end") ? "input-error" : "",
+                  }),
                 }),
               ],
             }),
@@ -3715,7 +3994,7 @@ function SanctionsScreen() {
               className: "form-actions",
               children: [
                 jsx.jsx("span", {}),
-                jsx.jsx(Button, { onClick: addRecord, children: "儲存" }),
+                jsx.jsx(Button, { onClick: saveRecord, children: "儲存" }),
               ],
             }),
           ],
@@ -3730,10 +4009,21 @@ function TemplatesScreen() {
     [editing, setEditing] = React.useState(null),
     [page, setPage] = React.useState(1),
     [pageSize, setPageSize] = React.useState(10),
-    totalPages = Math.max(1, Math.ceil(templates.length / pageSize)),
+    [filterDraft, setFilterDraft] = React.useState({ name: "", type: "全部" }),
+    [filterCriteria, setFilterCriteria] = React.useState(null),
+    filteredTemplates = React.useMemo(() => {
+      if (!filterCriteria) return templates;
+      const name = (filterCriteria.name || "").trim();
+      return templates.filter((template) => {
+        if (name && !template.name.includes(name)) return false;
+        if (filterCriteria.type && filterCriteria.type !== "全部" && template.type !== filterCriteria.type) return false;
+        return true;
+      });
+    }, [templates, filterCriteria]),
+    totalPages = Math.max(1, Math.ceil(filteredTemplates.length / pageSize)),
     currentPage = Math.min(Math.max(1, page), totalPages),
-    pagedTemplates = templates
-      .map((template, index) => ({ template: template, index: index }))
+    pagedTemplates = filteredTemplates
+      .map((template) => ({ template: template, index: templates.indexOf(template) }))
       .slice((currentPage - 1) * pageSize, currentPage * pageSize);
   return jsx.jsxs(jsx.Fragment, {
     children: [
@@ -3754,11 +4044,18 @@ function TemplatesScreen() {
           jsx.jsxs("div", {
             className: "filters",
             children: [
-              jsx.jsx(Field, { label: "名稱", children: jsx.jsx("input", {}) }),
+              jsx.jsx(Field, {
+                label: "名稱",
+                children: jsx.jsx("input", {
+                  value: filterDraft.name,
+                  onChange: (event) => setFilterDraft({ ...filterDraft, name: event.target.value }),
+                }),
+              }),
               jsx.jsx(Field, {
                 label: "類別",
                 children: jsx.jsxs(Select, {
-                  value: "全部",
+                  value: filterDraft.type,
+                  onChange: (event) => setFilterDraft({ ...filterDraft, type: event.target.value }),
                   children: [
                     jsx.jsx("option", { children: "全部" }),
                     jsx.jsx("option", { children: "電子通知" }),
@@ -3766,7 +4063,11 @@ function TemplatesScreen() {
                   ],
                 }),
               }),
-              jsx.jsx(Button, { icon: Na, children: "查詢" }),
+              jsx.jsx(Button, {
+                icon: Na,
+                onClick: () => (setFilterCriteria(filterDraft), setPage(1)),
+                children: "查詢",
+              }),
             ],
           }),
           jsx.jsxs("table", {
@@ -3826,7 +4127,7 @@ function TemplatesScreen() {
             ],
           }),
           jsx.jsx(Pager, {
-            total: templates.length,
+            total: filteredTemplates.length,
             page: page,
             pageSize: pageSize,
             onPageChange: setPage,
@@ -4116,18 +4417,78 @@ function PageHeader({ eyebrow: eyebrow, title: title, desc: desc, action: action
   });
 }
 /* ---- 7.4 畫面 Screens：字典配置／角色權限／帳號管理 ---- */
+const SETTINGS_PERMISSIONS = ["臨櫃收件", "申請查看", "上呈主管", "審批申請", "退回補件", "發送通知", "報表匯出", "名單管理", "模板管理", "帳號管理"];
 function SettingsScreen({ kind: kind }) {
   const config = DemoData.settings[kind],
     [rows, setRows] = React.useState(config.rows),
-    [isModalOpen, setModalOpen] = React.useState(false),
+    [editing, setEditing] = React.useState(null),
+    [editingInvalid, setEditingInvalid] = React.useState(false),
     [toast, setToast] = React.useState(""),
     [page, setPage] = React.useState(1),
     [pageSize, setPageSize] = React.useState(10),
-    totalPages = Math.max(1, Math.ceil(rows.length / pageSize)),
+    [filterDraft, setFilterDraft] = React.useState({ name: "", status: "全部" }),
+    [filterCriteria, setFilterCriteria] = React.useState(null),
+    statusIndex = config.headers.indexOf("狀態"),
+    categoryIndex = kind === "dictionary" ? config.headers.indexOf("類別") : -1,
+    roleIndex = kind === "accounts" ? config.headers.indexOf("角色") : -1,
+    permissionIndex = kind === "roles" ? config.headers.indexOf("權限摘要") : -1,
+    updatedIndex = config.headers.length - 1,
+    filteredRows = React.useMemo(() => {
+      if (!filterCriteria) return rows;
+      const name = (filterCriteria.name || "").trim();
+      return rows.filter((row) => {
+        if (name && !row[0].includes(name)) return false;
+        if (
+          filterCriteria.status &&
+          filterCriteria.status !== "全部" &&
+          statusIndex >= 0 &&
+          row[statusIndex] !== filterCriteria.status
+        )
+          return false;
+        return true;
+      });
+    }, [rows, filterCriteria, statusIndex]),
+    totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize)),
     currentPage = Math.min(Math.max(1, page), totalPages),
-    pagedRows = rows
-      .map((row, rowIndex) => ({ row: row, rowIndex: rowIndex }))
-      .slice((currentPage - 1) * pageSize, currentPage * pageSize);
+    pagedRows = filteredRows
+      .map((row) => ({ row: row, rowIndex: rows.indexOf(row) }))
+      .slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    openAddModal = () =>
+      (setEditing({
+        rowIndex: undefined,
+        values: config.headers.map((header, index) =>
+          index === statusIndex
+            ? "啟用"
+            : index === categoryIndex
+              ? "承批公司"
+              : index === roleIndex
+                ? DemoData.roles[0]
+                : "",
+        ),
+      }),
+        setEditingInvalid(false)),
+    openEditModal = (row, rowIndex) => (setEditing({ rowIndex: rowIndex, values: [...row] }), setEditingInvalid(false)),
+    updateEditingValue = (index, value) => {
+      const nextValues = [...editing.values];
+      nextValues[index] = value;
+      setEditing({ ...editing, values: nextValues });
+    },
+    togglePermission = (permission) => {
+      const current = (editing.values[permissionIndex] || "").split("、").filter(Boolean),
+        next = current.includes(permission) ? current.filter((item) => item !== permission) : [...current, permission];
+      updateEditingValue(permissionIndex, next.join("、"));
+    },
+    saveRow = () => {
+      if (!editing.values[0].trim()) return setEditingInvalid(true);
+      const finalValues = [...editing.values];
+      (finalValues[0] = finalValues[0].trim(), (finalValues[updatedIndex] = formatNow()));
+      (editing.rowIndex === undefined
+        ? setRows([finalValues, ...rows])
+        : setRows(rows.map((row, index) => (index === editing.rowIndex ? finalValues : row))),
+        setEditing(null),
+        setToast(editing.rowIndex === undefined ? "已新增" : "已更新"),
+        setTimeout(() => setToast(""), 2200));
+    };
   return jsx.jsxs(jsx.Fragment, {
     children: [
       jsx.jsx(PageHeader, {
@@ -4149,7 +4510,7 @@ function SettingsScreen({ kind: kind }) {
               }),
             jsx.jsxs(Button, {
               icon: Wn,
-              onClick: () => setModalOpen(true),
+              onClick: openAddModal,
               children: ["新增", kind === "roles" ? "角色" : "資料"],
             }),
           ],
@@ -4163,12 +4524,16 @@ function SettingsScreen({ kind: kind }) {
             children: [
               jsx.jsx(Field, {
                 label: kind === "accounts" ? "帳號名稱" : "名稱",
-                children: jsx.jsx("input", {}),
+                children: jsx.jsx("input", {
+                  value: filterDraft.name,
+                  onChange: (event) => setFilterDraft({ ...filterDraft, name: event.target.value }),
+                }),
               }),
               jsx.jsx(Field, {
                 label: "狀態",
                 children: jsx.jsxs(Select, {
-                  value: "全部",
+                  value: filterDraft.status,
+                  onChange: (event) => setFilterDraft({ ...filterDraft, status: event.target.value }),
                   children: [
                     jsx.jsx("option", { children: "全部" }),
                     jsx.jsx("option", { children: "啟用" }),
@@ -4176,7 +4541,11 @@ function SettingsScreen({ kind: kind }) {
                   ],
                 }),
               }),
-              jsx.jsx(Button, { icon: Na, children: "查詢" }),
+              jsx.jsx(Button, {
+                icon: Na,
+                onClick: () => (setFilterCriteria(filterDraft), setPage(1)),
+                children: "查詢",
+              }),
             ],
           }),
           jsx.jsxs("table", {
@@ -4215,7 +4584,7 @@ function SettingsScreen({ kind: kind }) {
                             className: "icon-actions",
                             children: [
                               jsx.jsx("button", {
-                                onClick: () => setModalOpen(true),
+                                onClick: () => openEditModal(row, rowIndex),
                                 children: jsx.jsx(T0, {}),
                               }),
                               jsx.jsx("button", {
@@ -4235,7 +4604,7 @@ function SettingsScreen({ kind: kind }) {
             ],
           }),
           jsx.jsx(Pager, {
-            total: rows.length,
+            total: filteredRows.length,
             page: page,
             pageSize: pageSize,
             onPageChange: setPage,
@@ -4243,28 +4612,75 @@ function SettingsScreen({ kind: kind }) {
           }),
         ],
       }),
-      isModalOpen &&
+      editing &&
         jsx.jsxs(Modal, {
-          title: `新增${kind === "roles" ? "角色" : "資料"}`,
-          onClose: () => setModalOpen(false),
+          title: `${editing.rowIndex === undefined ? "新增" : "編輯"}${kind === "roles" ? "角色" : "資料"}`,
+          onClose: () => setEditing(null),
           children: [
             jsx.jsxs("div", {
               className: "form-grid",
               children: [
-                jsx.jsx(Field, {
-                  label: "名稱",
-                  required: true,
-                  children: jsx.jsx("input", {}),
-                }),
-                jsx.jsx(Field, {
-                  label: "狀態",
-                  children: jsx.jsxs(Select, {
-                    value: "啟用",
-                    children: [
-                      jsx.jsx("option", { children: "啟用" }),
-                      jsx.jsx("option", { children: "停用" }),
-                    ],
-                  }),
+                config.headers.map((header, index) => {
+                  if (index === updatedIndex || index === permissionIndex) return null;
+                  if (index === statusIndex)
+                    return jsx.jsx(
+                      Field,
+                      {
+                        label: header,
+                        children: jsx.jsxs(Select, {
+                          value: editing.values[index],
+                          onChange: (event) => updateEditingValue(index, event.target.value),
+                          children: [
+                            jsx.jsx("option", { children: "啟用" }),
+                            jsx.jsx("option", { children: "停用" }),
+                          ],
+                        }),
+                      },
+                      header,
+                    );
+                  if (index === categoryIndex)
+                    return jsx.jsx(
+                      Field,
+                      {
+                        label: header,
+                        children: jsx.jsxs(Select, {
+                          value: editing.values[index],
+                          onChange: (event) => updateEditingValue(index, event.target.value),
+                          children: ["承批公司", "證件類型", "下拉項字典配置"].map((option) =>
+                            jsx.jsx("option", { children: option }, option),
+                          ),
+                        }),
+                      },
+                      header,
+                    );
+                  if (index === roleIndex)
+                    return jsx.jsx(
+                      Field,
+                      {
+                        label: header,
+                        children: jsx.jsx(Select, {
+                          value: editing.values[index],
+                          onChange: (event) => updateEditingValue(index, event.target.value),
+                          children: DemoData.roles.map((option) =>
+                            jsx.jsx("option", { children: option }, option),
+                          ),
+                        }),
+                      },
+                      header,
+                    );
+                  return jsx.jsx(
+                    Field,
+                    {
+                      label: header,
+                      required: index === 0,
+                      children: jsx.jsx("input", {
+                        value: editing.values[index],
+                        onChange: (event) => updateEditingValue(index, event.target.value),
+                        className: index === 0 && editingInvalid ? "input-error" : "",
+                      }),
+                    },
+                    header,
+                  );
                 }),
                 kind === "roles" &&
                   jsx.jsx(Field, {
@@ -4272,22 +4688,18 @@ function SettingsScreen({ kind: kind }) {
                     wide: true,
                     children: jsx.jsx("div", {
                       className: "permission-grid",
-                      children: [
-                        "臨櫃收件",
-                        "申請查看",
-                        "上呈主管",
-                        "審批申請",
-                        "退回補件",
-                        "發送通知",
-                        "報表匯出",
-                        "名單管理",
-                        "模板管理",
-                        "帳號管理",
-                      ].map((permission) =>
+                      children: SETTINGS_PERMISSIONS.map((permission) =>
                         jsx.jsxs(
                           "label",
                           {
-                            children: [jsx.jsx("input", { type: "checkbox" }), permission],
+                            children: [
+                              jsx.jsx("input", {
+                                type: "checkbox",
+                                checked: (editing.values[permissionIndex] || "").split("、").includes(permission),
+                                onChange: () => togglePermission(permission),
+                              }),
+                              permission,
+                            ],
                           },
                           permission,
                         ),
@@ -4296,11 +4708,13 @@ function SettingsScreen({ kind: kind }) {
                   }),
               ],
             }),
+            editingInvalid &&
+              jsx.jsx("div", { className: "field-error", children: `請填寫${config.headers[0]}。` }),
             jsx.jsxs("div", {
               className: "form-actions",
               children: [
                 jsx.jsx("span", {}),
-                jsx.jsx(Button, { onClick: () => setModalOpen(false), children: "儲存" }),
+                jsx.jsx(Button, { onClick: saveRow, children: "儲存" }),
               ],
             }),
           ],
@@ -4526,6 +4940,27 @@ function App() {
     [flowDirty, setFlowDirty] = React.useState(false),
         contextMenuRef = React.useRef(null),
         draftSaveRef = React.useRef(null),
+    roleAccess = {
+      櫃枱人員: ["dashboard", "intake", "applications"],
+      處理人員: [
+        "dashboard",
+        "applications",
+        "reports",
+        "sanctions",
+      ],
+      主管: [
+        "dashboard",
+        "applications",
+        "reports",
+        "sanctions",
+        "templates",
+        "logs",
+      ],
+      系統管理員: NAV_ITEMS.map((navItem) => navItem.id),
+    },
+    canAccessRoute = (targetRole, targetRoute) =>
+      targetRoute === "detail" ||
+      (roleAccess[targetRole] || []).includes(targetRoute === "terminate" ? "intake" : targetRoute),
     isFlowActive = isLoggedIn && (route === "intake" || route === "terminate"),
     requestLeaveFlow = (action) => {
       if (isFlowActive && flowDirty) {
@@ -4539,7 +4974,7 @@ function App() {
       (setCurrentApplication(application), setRoute("detail"));
     },
     navigate = (routeId) => {
-      if (routeId === route) return;
+      if (routeId === route || !canAccessRoute(role, routeId)) return;
       requestLeaveFlow(() => {
         (window.history.pushState(null, "", `#${routeId}`), setRoute(routeId), setCurrentApplication(null), setIntake(null), setCheckResult(null), setResumeDraft(null), setFlowDirty(false));
       });
@@ -4584,6 +5019,7 @@ function App() {
     createApplication = (formData) => {
       var partyText;
       const caseId = `${111 + applications.length}/DICJ/2026`,
+        isRelativeCase = formData.party === "親屬申請",
         newApplication = makeDemoApplication({
           id: caseId,
           name: formData.name,
@@ -4600,16 +5036,41 @@ function App() {
           status: "待處理",
           notify: "電子通知",
           time: "2026-08-27 10:30",
-          applicantDetails: {
-            foreignName: formData.en,
-            gender: formData.applicant.gender || "",
-            birthDate: formData.applicant.birth || "",
-            docType: formData.applicant.docType || "",
-            docNo: formData.doc,
-            phone: `${formData.personal.phoneCode || ""} ${formData.personal.phone || ""}`.trim(),
-            email: formData.personal.email,
-            address: formData.personal.address,
-          },
+          applicantDetails: isRelativeCase
+            ? {
+                foreignName: formData.en,
+                gender: formData.relative.gender || "",
+                birthDate: formData.relative.birth || "",
+                docType: formData.relative.docType || "",
+                docNo: formData.relative.docNo || "",
+                phone: `${formData.relative.phoneCode || ""} ${formData.relative.phone || ""}`.trim(),
+                email: formData.relative.email,
+                address: formData.relative.address,
+              }
+            : {
+                foreignName: formData.en,
+                gender: formData.applicant.gender || "",
+                birthDate: formData.applicant.birth || "",
+                docType: formData.applicant.docType || "",
+                docNo: formData.doc,
+                phone: `${formData.personal.phoneCode || ""} ${formData.personal.phone || ""}`.trim(),
+                email: formData.personal.email,
+                address: formData.personal.address,
+              },
+          filerDetails: isRelativeCase
+            ? {
+                name: formData.applicant.name || "",
+                foreignName: formData.applicant.en || "",
+                relation: formData.relative.relation || "",
+                gender: formData.applicant.gender || "",
+                birthDate: formData.applicant.birth || "",
+                docType: formData.applicant.docType || "",
+                docNo: formData.doc,
+                phone: `${formData.personal.phoneCode || ""} ${formData.personal.phone || ""}`.trim(),
+                email: formData.personal.email,
+                address: formData.personal.address,
+              }
+            : null,
           termsDetails: {
             effectiveDate: formData.effectiveDate,
             endDate: formData.endDate,
@@ -4619,6 +5080,7 @@ function App() {
                 : formData.companies.join("、") || formData.scope,
             pickupMethod: "親臨",
             counsel: formData.counsel,
+            referralChannels: (formData.referralChannels || []).join("、"),
           },
         });
       (formData.applicant &&
@@ -4722,7 +5184,8 @@ function App() {
       if (id === route) return;
       if (isFlowActive) window.history.replaceState(null, "", `#${route}`);
       requestLeaveFlow(() => {
-        const target = id === "detail" && !currentApplication ? "applications" : id;
+        const rawTarget = id === "detail" && !currentApplication ? "applications" : id,
+          target = canAccessRoute(role, rawTarget) ? rawTarget : "dashboard";
         window.history.replaceState(null, "", `#${target}`);
         (setRoute(target), setIntake(null), setCheckResult(null), setResumeDraft(null), setFlowDirty(false));
         if (target !== "detail") setCurrentApplication(null);
@@ -4740,7 +5203,7 @@ function App() {
       window.removeEventListener("hashchange", handleHashChange);
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
-  }, [route, isLoggedIn, currentApplication, flowDirty]);
+  }, [route, isLoggedIn, currentApplication, flowDirty, role]);
   React.useEffect(() => {
     /* 啟動時寫入示範草稿，確保「澳門居民身份證 12345678 已暫存」可演示 */
     seedDemoDrafts();
@@ -4765,25 +5228,7 @@ function App() {
           (window.location.hash = selectedRole === "櫃枱人員" ? "intake" : "dashboard"));
       },
     });
-  const roleAccess = {
-      櫃枱人員: ["dashboard", "intake", "applications"],
-      處理人員: [
-        "dashboard",
-        "applications",
-        "reports",
-        "sanctions",
-      ],
-      主管: [
-        "dashboard",
-        "applications",
-        "reports",
-        "sanctions",
-        "templates",
-        "logs",
-      ],
-      系統管理員: NAV_ITEMS.map((navItem) => navItem.id),
-    },
-    visibleNavItems = NAV_ITEMS.filter((navItem) => roleAccess[role].includes(navItem.id)),
+  const visibleNavItems = NAV_ITEMS.filter((navItem) => roleAccess[role].includes(navItem.id)),
     approvalCount = getActionableApplications(applications, role).length,
     account = DemoAccounts.find((account) => account.role === role) || DemoAccounts[3];
   return jsx.jsxs("div", {
@@ -4954,7 +5399,7 @@ function App() {
               value: role,
               onChange: (event) => {
                 const newRole = event.target.value;
-                const mustLeave = route !== "detail" && !roleAccess[newRole].includes(route);
+                const mustLeave = !canAccessRoute(newRole, route);
                 const changeRole = () => {
                 if (mustLeave) {
                   (window.history.pushState(null, "", "#dashboard"), setRoute("dashboard"), setIntake(null), setCheckResult(null), setFlowDirty(false));

@@ -75,9 +75,48 @@ test("臨櫃待審批以內部階段轉移負責角色", () => {
   assert.equal(current.stage, "supervisor_approval");
   current = run(current, "counter_approve_sign", ROLES.SUPERVISOR);
   assert.equal(current.status, "已審批");
+  current = run(current, "complete_processing", ROLES.PROCESSOR);
   current = run(current, "counter_print_documents", ROLES.COUNTER);
   current = run(current, "counter_record_handover", ROLES.COUNTER);
   assert.equal(current.status, "完成");
+});
+
+test("臨櫃案件已審批時須完成案件處理並列印才能記錄領取", () => {
+  let current = application({ source: "親臨", status: "已審批", stage: null });
+  assert.deepEqual(
+    getAvailableActions(current, ROLES.ADMIN).map((action) => action.id).sort(),
+    ["complete_processing", "counter_print_documents", "void_case"].sort(),
+  );
+  current = run(current, "counter_print_documents", ROLES.COUNTER);
+  assert.equal(
+    getAvailableActions(current, ROLES.ADMIN).some((action) => action.id === "counter_record_handover"),
+    false,
+  );
+  current = run(current, "complete_processing", ROLES.PROCESSOR);
+  assert.deepEqual(
+    getAvailableActions(current, ROLES.ADMIN).map((action) => action.id).sort(),
+    ["counter_record_handover", "void_case"].sort(),
+  );
+});
+
+test("臨櫃案件複核或審批階段可退回，補正後重新送複核", () => {
+  let current = application({ source: "親臨", status: "待審批", stage: "processor_review" });
+  current = run(current, "counter_return_case", ROLES.PROCESSOR);
+  assert.equal(current.status, "退回");
+  assert.deepEqual(
+    getAvailableActions(current, ROLES.ADMIN).map((action) => action.id).sort(),
+    ["counter_resubmit_review", "void_case"].sort(),
+  );
+  current = run(current, "counter_resubmit_review", ROLES.COUNTER);
+  assert.equal(current.status, "待審批");
+  assert.equal(current.stage, "processor_review");
+
+  current = run(
+    application({ source: "親臨", status: "待審批", stage: "supervisor_approval" }),
+    "counter_request_return",
+    ROLES.SUPERVISOR,
+  );
+  assert.equal(current.status, "退回");
 });
 
 test("處理人員與主管可作廢未完成的臨櫃案件", () => {
