@@ -28,7 +28,7 @@ const NAV_ITEMS = [
   { label: "帳號管理", id: "accounts", icon: rf },
   { label: "操作日誌", id: "logs", icon: W8 },
 ];
-const APP_VERSION = "2026.09.21 14:04PM";
+const APP_VERSION = "2026.09.21 18:14PM";
 const FRONTEND_CHANGELOG = [
   {
 title: "2026.09.21 下午更新內容",
