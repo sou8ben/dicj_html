@@ -654,6 +654,13 @@ tbody tr:last-child td {
   border-bottom: 0;
 }
 
+.cell-name small {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 tr:hover td {
   background: #f7fafc;
 }
@@ -1607,8 +1614,15 @@ input[type="radio"]:focus-visible {
 }
 
 .action-panel {
-  border-color: #b9cedb;
-  background: #fbfdfe;
+  border-color: var(--brand-700);
+  background: var(--brand-050);
+  box-shadow:
+    0 1px 2px rgba(24, 48, 65, 0.04),
+    0 10px 26px rgba(10, 92, 143, 0.12);
+}
+
+.action-panel h2 {
+  color: var(--brand-800);
 }
 
 .readonly-note {
