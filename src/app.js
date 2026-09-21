@@ -27,22 +27,32 @@ const NAV_ITEMS = [
   { label: "帳號管理", id: "accounts", icon: rf },
   { label: "操作日誌", id: "logs", icon: W8 },
 ];
-const APP_VERSION = "2026.09.20 22:56PM";
+const APP_VERSION = "2026.09.21 14:04PM";
 const FRONTEND_CHANGELOG = [
-  {
-title: "2026.09.20 更新內容",
+{
+title: "2026.09.21 更新內容",
 items: [
-"博彩承批公司及輔導服務改為必填欄位，並修正「指定承批公司」錯誤預選的顯示問題。",
-"新增日期驗證，廢止日不得早於生效日。",
-"工作台及申請管理列表新增「申請方」欄位，可顯示並排序「本人／親屬」申請類型。",
-"優化親屬申請案件詳情顯示：清楚區分被申請人與提出申請的親屬資料，並新增顯示親屬身份、與被申請人關係及聯絡資料；本人申請的顯示方式維持不變。",
-"一戶通案件確認缺件後，系統自動發送補件通知並直接進入「已通知補件」，移除「待通知補件」狀態及手動發送通知的操作。",
-"工作台及申請管理列表欄位以「取件方式」取代「通知方式」",
-"表格新增排序功能，點擊欄位標題可依該欄位排序，並顯示排序方向",
-"美化案件流程進度條",
-"移除「待通知補件」狀態；確認缺件後系統會自動發送補件通知並直接進入「已通知補件」，收到補交資料後則返回「待處理」",
+"優化案件詳情側邊欄導覽，從「工作台」、「申請管理」或「臨櫃收件」進入案件詳情時，保留原功能選項的高亮狀態。",
+"簡化各功能頁面的標題區域，移除標題上方的 eyebrow 輔助標籤及標題下方的說明文字，套用於工作台、臨櫃收件、申請管理、報表、行政處罰名單、模板、公眾假期、系統設定及操作日誌等頁面。",
+"重整工作台統計資訊，將「我的待辦」及「超時未處理」移至「待辦申請」面板標題右側，兩項數據整合為同一統計區塊並以分隔線區隔，同時改為隨內容自適應寬度及縮小圖示與數字尺寸。",
+"調整整體介面密度，縮小主要內容區內距，頁面標題由 28px 調整為 24px，並縮短頁面標題與內容之間的距離。",
+"優化身份資料讀取方式的選擇介面，卡片最大寬度由 760px 調整為 560px，最低高度由 164px 調整為 120px，使畫面更緊湊。",
 ],
 },
+  {
+    title: "2026.09.20 更新內容",
+    items: [
+      "博彩承批公司及輔導服務改為必填欄位，並修正「指定承批公司」錯誤預選的顯示問題。",
+      "新增日期驗證，廢止日不得早於生效日。",
+      "工作台及申請管理列表新增「申請方」欄位，可顯示並排序「本人／親屬」申請類型。",
+      "優化親屬申請案件詳情顯示：清楚區分被申請人與提出申請的親屬資料，並新增顯示親屬身份、與被申請人關係及聯絡資料；本人申請的顯示方式維持不變。",
+      "一戶通案件確認缺件後，系統自動發送補件通知並直接進入「已通知補件」，移除「待通知補件」狀態及手動發送通知的操作。",
+      "工作台及申請管理列表欄位以「取件方式」取代「通知方式」",
+      "表格新增排序功能，點擊欄位標題可依該欄位排序，並顯示排序方向",
+      "美化案件流程進度條",
+      "移除「待通知補件」狀態；確認缺件後系統會自動發送補件通知並直接進入「已通知補件」，收到補交資料後則返回「待處理」",
+      ],
+    },
   {
     title: "2026.09.16 更新內容",
     items: [
@@ -664,63 +674,75 @@ function DashboardScreen({ applications: applications, onOpen: onOpen, role: rol
         : "目前沒有逾期案件";
   return jsx.jsxs(jsx.Fragment, {
     children: [
-      jsx.jsxs("div", {
+      jsx.jsx("div", {
         className: "page-heading",
-        children: [
-          jsx.jsxs("div", {
-            children: [
-              jsx.jsx("p", { className: "eyebrow" }),
-              jsx.jsx("h1", { children: "工作台" }),
-            ],
-          }),
-
-        ],
-      }),
-      jsx.jsxs("div", {
-        className: "metrics",
-        children: [
-          jsx.jsxs("article", {
-            children: [
-              jsx.jsx("span", {
-                className: "metric-icon",
-                children: jsx.jsx(V0, { size: 22, weight: "duotone" }),
-              }),
-              jsx.jsx("span", {
-                className: "metric-label amber-dot",
-                children: "我的待辦",
-              }),
-              jsx.jsx("strong", { children: actionable.length }),
-              jsx.jsx("small", { children: statusSummary }),
-            ],
-          }),
-          jsx.jsxs("article", {
-            className: "metric-card-danger",
-            children: [
-              jsx.jsx("span", {
-                className: "metric-icon",
-                children: jsx.jsx(B8, { size: 22, weight: "duotone" }),
-              }),
-              jsx.jsx("span", {
-                className: "metric-label red-dot",
-                children: "超時未處理",
-              }),
-              jsx.jsx("strong", { children: overdue.length }),
-              jsx.jsx("small", { children: overdueSummary }),
-            ],
-          }),
-        ],
+        children: jsx.jsx("div", {
+          children: jsx.jsx("h1", { children: "工作台" }),
+        }),
       }),
       jsx.jsxs("section", {
         className: "panel",
         children: [
           jsx.jsxs("div", {
             className: "panel-head",
-            children: jsx.jsxs("div", {
-              children: [
-                jsx.jsx("h2", { children: "待辦申請" }),
-                jsx.jsx("p", { children: "按優先次序顯示需要處理的案件" }),
-              ],
-            }),
+            children: [
+              jsx.jsxs("div", {
+                children: [
+                  jsx.jsx("h2", { children: "待辦申請" }),
+                  jsx.jsx("p", { children: "按優先次序顯示需要處理的案件" }),
+                ],
+              }),
+              jsx.jsxs("div", {
+                className: "heading-metrics",
+                children: [
+                  jsx.jsxs("article", {
+                    className: "heading-metric",
+                    children: [
+                      jsx.jsx("span", {
+                        className: "heading-metric-icon",
+                        children: jsx.jsx(V0, { size: 20, weight: "duotone" }),
+                      }),
+                      jsx.jsxs("div", {
+                        className: "heading-metric-body",
+                        children: [
+                          jsx.jsxs("div", {
+                            className: "heading-metric-top",
+                            children: [
+                              jsx.jsx("strong", { className: "heading-metric-value", children: actionable.length }),
+                              jsx.jsx("span", { className: "heading-metric-label", children: "我的待辦" }),
+                            ],
+                          }),
+                          jsx.jsx("small", { className: "heading-metric-sub", children: statusSummary }),
+                        ],
+                      }),
+                    ],
+                  }),
+                  jsx.jsx("span", { className: "heading-metric-divider" }),
+                  jsx.jsxs("article", {
+                    className: "heading-metric heading-metric-danger",
+                    children: [
+                      jsx.jsx("span", {
+                        className: "heading-metric-icon",
+                        children: jsx.jsx(B8, { size: 20, weight: "duotone" }),
+                      }),
+                      jsx.jsxs("div", {
+                        className: "heading-metric-body",
+                        children: [
+                          jsx.jsxs("div", {
+                            className: "heading-metric-top",
+                            children: [
+                              jsx.jsx("strong", { className: "heading-metric-value", children: overdue.length }),
+                              jsx.jsx("span", { className: "heading-metric-label", children: "超時未處理" }),
+                            ],
+                          }),
+                          jsx.jsx("small", { className: "heading-metric-sub", children: overdueSummary }),
+                        ],
+                      }),
+                    ],
+                  }),
+                ],
+              }),
+            ],
           }),
           jsx.jsx(SearchFilters, { onSearch: (criteria) => (setFilterCriteria(criteria), setPage(1)) }),
           jsx.jsx(ApplicationsTable, {
@@ -785,11 +807,9 @@ function IntakeReadScreen({ mode: mode, onContinue: onContinue, fillKey: fillKey
         className: "page-heading",
         children: jsx.jsxs("div", {
           children: [
-            jsx.jsx("p", { className: "eyebrow", children: "臨櫃收件" }),
             jsx.jsx("h1", {
               children: mode === "terminate" ? "廢止申請" : "申請",
             }),
-            jsx.jsx("p", { children: "讀取身份資料並檢查現有禁入紀錄。" }),
           ],
         }),
       }),
@@ -1033,9 +1053,7 @@ function RecordCheck({ mode: mode, docNo: docNo, docType: docType, onBack: onBac
         className: "page-heading",
         children: jsx.jsxs("div", {
           children: [
-            jsx.jsx("p", { className: "eyebrow", children: "臨櫃收件" }),
             jsx.jsx("h1", { children: mode === "terminate" ? "廢止申請" : "申請" }),
-            jsx.jsx("p", { children: "核查申請人現有的禁入紀錄。" }),
           ],
         }),
       }),
@@ -2246,22 +2264,7 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
         className: "page-heading",
         children: jsx.jsxs("div", {
           children: [
-            jsx.jsx("p", { className: "eyebrow", children: "臨櫃收件" }),
             jsx.jsx("h1", { children: mode === "terminate" ? "廢止申請" : "申請" }),
-            jsx.jsx("p", {
-              children:
-                step === 1
-                  ? "選擇申請方式。"
-                  : step === previewStep
-                    ? "核對申請資料並確認提交。"
-                    : step === 3 && isRelative
-                      ? "填寫親屬證件資料。"
-                      : step === 4 && isRelative
-                        ? "填寫親屬資料。"
-                        : mode === "terminate"
-                          ? "填寫廢止申請資料。"
-                          : "填寫申請資料。",
-            }),
           ],
         }),
       }),
@@ -2649,7 +2652,6 @@ function ApplicationsListScreen({ rows: rows, onOpen: onOpen }) {
         className: "page-heading",
         children: jsx.jsxs("div", {
           children: [
-            jsx.jsx("p", { className: "eyebrow", children: "案件處理" }),
             jsx.jsx("h1", { children: "申請管理" })
           ],
         }),
@@ -3624,9 +3626,7 @@ ${reportName},${dateFrom} 至 ${dateTo},2026-08-27 10:30`,
         className: "page-heading",
         children: jsx.jsxs("div", {
           children: [
-            jsx.jsx("p", { className: "eyebrow", children: "數據中心" }),
             jsx.jsx("h1", { children: "報表及查詢" }),
-            jsx.jsx("p", { children: "按日期產生及下載業務統計。" }),
           ],
         }),
       }),
@@ -3778,9 +3778,7 @@ function SanctionsScreen() {
         children: [
           jsx.jsxs("div", {
             children: [
-              jsx.jsx("p", { className: "eyebrow", children: "名單管理" }),
               jsx.jsx("h1", { children: "行政處罰名單" }),
-              jsx.jsx("p", { children: "管理行政處罰所產生的娛樂場禁入紀錄。" }),
             ],
           }),
           jsx.jsxs("div", {
@@ -4031,9 +4029,7 @@ function TemplatesScreen() {
   return jsx.jsxs(jsx.Fragment, {
     children: [
       jsx.jsx(PageHeader, {
-        eyebrow: "內容設定",
         title: "內容模板管理",
-        desc: "管理案件通知所使用的電子通知與短信內容。",
         action: jsx.jsx(Button, {
           icon: Wn,
           onClick: () =>
@@ -4277,9 +4273,7 @@ function HolidaysScreen() {
   return jsx.jsxs(jsx.Fragment, {
     children: [
       jsx.jsx(PageHeader, {
-        eyebrow: "系統設定",
         title: "公眾假期管理",
-        desc: "匯入 ICS 日曆檔以維護本局公眾假期資料。",
         action: jsx.jsx(Button, {
           icon: Sd,
           onClick: () => fileInputRef.current && fileInputRef.current.click(),
@@ -4404,16 +4398,12 @@ function HolidaysScreen() {
   });
 }
 /* ---- 7.3 共用元件 Components：頁面標題 PageHeader ---- */
-function PageHeader({ eyebrow: eyebrow, title: title, desc: desc, action: action }) {
+function PageHeader({ title: title, action: action }) {
   return jsx.jsxs("div", {
     className: "page-heading",
     children: [
-      jsx.jsxs("div", {
-        children: [
-          jsx.jsx("p", { className: "eyebrow", children: eyebrow }),
-          jsx.jsx("h1", { children: title }),
-          jsx.jsx("p", { children: desc }),
-        ],
+      jsx.jsx("div", {
+        children: jsx.jsx("h1", { children: title }),
       }),
       action,
     ],
@@ -4495,9 +4485,7 @@ function SettingsScreen({ kind: kind }) {
   return jsx.jsxs(jsx.Fragment, {
     children: [
       jsx.jsx(PageHeader, {
-        eyebrow: config.eyebrow,
         title: config.title,
-        desc: config.desc,
         action: jsx.jsxs("div", {
           className: "button-row",
           children: [
@@ -4737,9 +4725,7 @@ function OperationLogsScreen() {
   return jsx.jsxs(jsx.Fragment, {
     children: [
       jsx.jsx(PageHeader, {
-        eyebrow: "稽核",
         title: "操作日誌",
-        desc: "查閱系統內所有重要操作，日誌不可修改或刪除。",
       }),
       jsx.jsxs("section", {
         className: "panel",
@@ -4931,6 +4917,7 @@ function App() {
     [route, setRoute] = React.useState(() => window.location.hash.slice(1) || "dashboard"),
     [applications, setApplications] = React.useState(DemoData.applications),
     [currentApplication, setCurrentApplication] = React.useState(null),
+    [detailOrigin, setDetailOrigin] = React.useState("applications"),
     [intake, setIntake] = React.useState(null),
     [checkResult, setCheckResult] = React.useState(null),
     [resumeDraft, setResumeDraft] = React.useState(null),
@@ -4974,7 +4961,7 @@ function App() {
       }
     },
     openDetail = (application) => {
-      (setCurrentApplication(application), setRoute("detail"));
+      (setDetailOrigin(route === "approvals" ? "dashboard" : route), setCurrentApplication(application), setRoute("detail"));
     },
     navigate = (routeId) => {
       if (routeId === route || !canAccessRoute(role, routeId)) return;
@@ -5092,6 +5079,7 @@ function App() {
         removeDraft(buildDraftKey(formData.applicant.docType, formData.doc)),
         setApplications([newApplication, ...applications]),
         setCurrentApplication(newApplication),
+        setDetailOrigin(formData.mode === "terminate" ? "terminate" : "intake"),
         setRoute("detail"),
         setIntake(null),
         setCheckResult(null),
@@ -5232,6 +5220,7 @@ function App() {
       },
     });
   const visibleNavItems = NAV_ITEMS.filter((navItem) => roleAccess[role].includes(navItem.id)),
+    activeNavRoute = route === "detail" ? detailOrigin : route,
     approvalCount = getActionableApplications(applications, role).length,
     account = DemoAccounts.find((account) => account.role === role) || DemoAccounts[3];
   return jsx.jsxs("div", {
@@ -5286,8 +5275,8 @@ function App() {
                   children: [
                     jsx.jsxs("button", {
                       className:
-                        route === navItem.id ||
-                        (navItem.children && navItem.children.some((child) => child.id === route))
+                        activeNavRoute === navItem.id ||
+                        (navItem.children && navItem.children.some((child) => child.id === activeNavRoute))
                           ? "active"
                           : "",
                       onClick: () => navigate(navItem.id),
@@ -5312,7 +5301,7 @@ function App() {
                           jsx.jsx(
                             "button",
                             {
-                              className: route === child.id ? "active" : "",
+                              className: activeNavRoute === child.id ? "active" : "",
                               onClick: () => navigate(child.id),
                               children: child.label,
                             },

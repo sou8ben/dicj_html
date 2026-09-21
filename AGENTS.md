@@ -39,6 +39,7 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 
 ## Durable visual decisions
 
+- `.page-heading` shows only the `<h1>` title (plus any trailing `action`); do not add an `.eyebrow` label or a subtitle `<p>` above/below it. This does not apply to other headings outside `.page-heading`, such as the case-detail `.section-title` eyebrow or the login card.
 - Within `.form-actions`, place all `.btn-danger` buttons at the far left and all `.btn-primary` buttons at the far right, including buttons inside `.button-row`.
 - Table action-column headers, cells, and button groups stay right-aligned, including the hovered-row state.
 - In the application form, keep 「申請禁入之博彩承批公司」 as an unmarked section title, then show a separate 「博彩承批公司」 field label with a red required asterisk immediately above its radio row; 「輔導服務」 also shows the red required asterisk. Preview and read-only detail labels remain unmarked.

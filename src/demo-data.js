@@ -416,9 +416,7 @@ const DemoData = {
   ],
   settings: {
     dictionary: {
-      eyebrow: "系統設定",
       title: "字典配置",
-      desc: "維護承批公司及證件類型等共用資料。",
       headers: ["名稱", "類別", "狀態", "更新時間"],
       rows: [
         ["澳娛綜合度假股份有限公司", "承批公司", "啟用", "2026-07-05 10:20"],
@@ -427,9 +425,7 @@ const DemoData = {
       ],
     },
     roles: {
-      eyebrow: "存取控制",
       title: "角色權限管理",
-      desc: "設定角色可查閱及操作的系統功能。",
       headers: ["名稱", "狀態", "權限摘要", "更新時間"],
       rows: [
         ["櫃枱人員", "啟用", "收件新增、申請查看", "2026-07-05 10:20"],
@@ -439,9 +435,7 @@ const DemoData = {
       ],
     },
     accounts: {
-      eyebrow: "使用者管理",
       title: "帳號管理",
-      desc: "同步內部帳號並指派角色與狀態。",
       headers: ["帳號名稱", "姓名", "狀態", "角色", "更新時間"],
       rows: DemoAccounts.map((a) => [a.id, a.name, a.status, a.role, a.updated]),
     },
