@@ -73,7 +73,7 @@ function DashboardScreen({ applications: applications, onOpen: onOpen, role: rol
                             className: "heading-metric-top",
                             children: [
                               jsx.jsx("strong", { className: "heading-metric-value", children: actionable.length }),
-                              jsx.jsx("span", { className: "heading-metric-label", children: "我的待辦" }),
+                              jsx.jsx("span", { className: "heading-metric-label", children: "項待辦" }),
                             ],
                           }),
                           jsx.jsx("small", { className: "heading-metric-sub", children: statusSummary }),
@@ -96,7 +96,7 @@ function DashboardScreen({ applications: applications, onOpen: onOpen, role: rol
                             className: "heading-metric-top",
                             children: [
                               jsx.jsx("strong", { className: "heading-metric-value", children: overdue.length }),
-                              jsx.jsx("span", { className: "heading-metric-label", children: "超時未處理" }),
+                              jsx.jsx("span", { className: "heading-metric-label", children: "項超時" }),
                             ],
                           }),
                           jsx.jsx("small", { className: "heading-metric-sub", children: overdueSummary }),

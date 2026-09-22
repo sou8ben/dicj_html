@@ -21,6 +21,7 @@ function SettingsScreen({ kind: kind }) {
     roleIndex = kind === "accounts" ? config.headers.indexOf("角色") : -1,
     permissionIndex = kind === "roles" ? config.headers.indexOf("權限摘要") : -1,
     updatedIndex = config.headers.length - 1,
+    isCreatingAccount = kind === "accounts" && editing !== null && editing.rowIndex === undefined,
     filteredRows = React.useMemo(() => {
       if (!filterCriteria) return rows;
       const name = (filterCriteria.name || "").trim();
@@ -44,6 +45,7 @@ function SettingsScreen({ kind: kind }) {
     openAddModal = () =>
       (setEditing({
         rowIndex: undefined,
+        initialPassword: "",
         values: config.headers.map((header, index) =>
           index === statusIndex
             ? "啟用"
@@ -67,14 +69,15 @@ function SettingsScreen({ kind: kind }) {
       updateEditingValue(permissionIndex, next.join("、"));
     },
     saveRow = () => {
-      if (!editing.values[0].trim()) return setEditingInvalid(true);
+      if (!editing.values[0].trim() || (isCreatingAccount && !editing.initialPassword.trim()))
+        return setEditingInvalid(true);
       const finalValues = [...editing.values];
       (finalValues[0] = finalValues[0].trim(), (finalValues[updatedIndex] = formatNow()));
       (editing.rowIndex === undefined
         ? setRows([finalValues, ...rows])
         : setRows(rows.map((row, index) => (index === editing.rowIndex ? finalValues : row))),
         setEditing(null),
-        setToast(editing.rowIndex === undefined ? "已新增" : "已更新"),
+        setToast(isCreatingAccount ? "已新建本地帳號" : editing.rowIndex === undefined ? "已新增" : "已更新"),
         setTimeout(() => setToast(""), 2200));
     };
   return jsx.jsxs(jsx.Fragment, {
@@ -97,7 +100,10 @@ function SettingsScreen({ kind: kind }) {
             jsx.jsxs(Button, {
               icon: Wn,
               onClick: openAddModal,
-              children: ["新增", kind === "roles" ? "角色" : "資料"],
+              children:
+                kind === "accounts"
+                  ? "新建本地帳號"
+                  : ["新增", kind === "roles" ? "角色" : "資料"],
             }),
           ],
         }),
@@ -200,11 +206,13 @@ function SettingsScreen({ kind: kind }) {
       }),
       editing &&
         jsx.jsxs(Modal, {
-          title: `${editing.rowIndex === undefined ? "新增" : "編輯"}${kind === "roles" ? "角色" : "資料"}`,
+          title: isCreatingAccount
+            ? "新建本地帳號"
+            : `${editing.rowIndex === undefined ? "新增" : "編輯"}${kind === "roles" ? "角色" : "資料"}`,
           onClose: () => setEditing(null),
           children: [
             jsx.jsxs("div", {
-              className: "form-grid",
+              className: `form-grid${isCreatingAccount ? " account-create-form" : ""}`,
               children: [
                 config.headers.map((header, index) => {
                   if (index === updatedIndex || index === permissionIndex) return null;
@@ -254,7 +262,7 @@ function SettingsScreen({ kind: kind }) {
                       },
                       header,
                     );
-                  return jsx.jsx(
+                  const valueField = jsx.jsx(
                     Field,
                     {
                       label: header,
@@ -262,11 +270,36 @@ function SettingsScreen({ kind: kind }) {
                       children: jsx.jsx("input", {
                         value: editing.values[index],
                         onChange: (event) => updateEditingValue(index, event.target.value),
-                        className: index === 0 && editingInvalid ? "input-error" : "",
+                        className:
+                          index === 0 && editingInvalid && !editing.values[0].trim() ? "input-error" : "",
                       }),
                     },
                     header,
                   );
+                  if (index === 0 && isCreatingAccount)
+                    return jsx.jsxs(
+                      jsx.Fragment,
+                      {
+                        children: [
+                          valueField,
+                          jsx.jsx(Field, {
+                            label: "初始密碼",
+                            required: true,
+                            children: jsx.jsx("input", {
+                              type: "password",
+                              autoComplete: "new-password",
+                              value: editing.initialPassword,
+                              onChange: (event) =>
+                                setEditing({ ...editing, initialPassword: event.target.value }),
+                              className:
+                                editingInvalid && !editing.initialPassword.trim() ? "input-error" : "",
+                            }),
+                          }),
+                        ],
+                      },
+                      header,
+                    );
+                  return valueField;
                 }),
                 kind === "roles" &&
                   jsx.jsx(Field, {
@@ -295,7 +328,15 @@ function SettingsScreen({ kind: kind }) {
               ],
             }),
             editingInvalid &&
-              jsx.jsx("div", { className: "field-error", children: `請填寫${config.headers[0]}。` }),
+              jsx.jsx("div", {
+                className: "field-error",
+                children:
+                  isCreatingAccount && !editing.values[0].trim() && !editing.initialPassword.trim()
+                    ? "請填寫帳號名稱及初始密碼。"
+                    : isCreatingAccount && !editing.initialPassword.trim()
+                      ? "請填寫初始密碼。"
+                      : `請填寫${config.headers[0]}。`,
+              }),
             jsx.jsxs("div", {
               className: "form-actions",
               children: [

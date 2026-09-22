@@ -189,7 +189,7 @@ function WizardProgress({ current: current, steps: steps }) {
         {
           className: stepNumber < current ? "done" : stepNumber === current ? "current" : "",
           "aria-current": stepNumber === current ? "step" : undefined,
-          children: [jsx.jsx("b", { children: stepNumber }), jsx.jsx("span", { children: stepLabel })],
+          children: stepLabel,
         },
         stepLabel,
       );

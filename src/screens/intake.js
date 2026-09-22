@@ -307,6 +307,7 @@ function RecordCheck({ mode: mode, docNo: docNo, docType: docType, onBack: onBac
             ],
           }),
           jsx.jsx(WizardProgress, { current: 2, steps: mode === "terminate" ? WizardSteps.terminate : WizardSteps.intake }),
+
           jsx.jsxs("div", {
             className: "section-title",
             children: [
@@ -322,37 +323,6 @@ function RecordCheck({ mode: mode, docNo: docNo, docType: docType, onBack: onBac
               }),
             ],
           }),
-          detectedDraft &&
-            jsx.jsxs("div", {
-              className: `draft-alert${draftEligible ? "" : " is-invalid"}`,
-              role: "status",
-              children: [
-                jsx.jsxs("div", {
-                  className: "draft-alert-content",
-                  children: [
-                    jsx.jsx("h3", { children: draftEligible ? "發現暫存草稿" : "暫存草稿已失效" }),
-                    jsx.jsx("p", {
-                      children: `草稿類型：${draftTypeText}　暫存時間：${detectedDraft.savedAt || "—"}`,
-                    }),
-                    draftEligible &&
-                      ((mode === "terminate") !== (draftKind === "terminate")) &&
-                      jsx.jsx("p", { children: `此草稿屬於${draftFlowText}，恢復後將自動切換流程。` }),
-                    draftInvalidReason && jsx.jsx("p", { className: "draft-alert-reason", children: draftInvalidReason }),
-                  ],
-                }),
-                draftEligible
-                  ? jsx.jsx(Button, {
-                      onClick: () => onResumeDraft(detectedDraft),
-                      children: "恢復草稿",
-                    })
-                  : !canStartCurrentFlow &&
-                    jsx.jsx(Button, {
-                      variant: "danger",
-                      onClick: deleteDetectedDraft,
-                      children: "刪除草稿",
-                    }),
-              ],
-            }),
           resultType === "new" &&
             jsx.jsx("div", {
               className: "record-alert",
@@ -423,6 +393,37 @@ function RecordCheck({ mode: mode, docNo: docNo, docType: docType, onBack: onBac
               children: jsx.jsx("span", {
                 children: "查無可廢止的禁入紀錄，請確認證件類型及證件號碼是否正確。",
               }),
+            }),
+                    detectedDraft &&
+            jsx.jsxs("div", {
+              className: `draft-alert${draftEligible ? "" : " is-invalid"}`,
+              role: "status",
+              children: [
+                jsx.jsxs("div", {
+                  className: "draft-alert-content",
+                  children: [
+                    jsx.jsx("h3", { children: draftEligible ? "發現暫存草稿" : "暫存草稿已失效" }),
+                    jsx.jsx("p", {
+                      children: `草稿類型：${draftTypeText}　暫存時間：${detectedDraft.savedAt || "—"}`,
+                    }),
+                    draftEligible &&
+                      ((mode === "terminate") !== (draftKind === "terminate")) &&
+                      jsx.jsx("p", { children: `此草稿屬於${draftFlowText}，恢復後將自動切換流程。` }),
+                    draftInvalidReason && jsx.jsx("p", { className: "draft-alert-reason", children: draftInvalidReason }),
+                  ],
+                }),
+                draftEligible
+                  ? jsx.jsx(Button, {
+                      onClick: () => onResumeDraft(detectedDraft),
+                      children: "恢復草稿",
+                    })
+                  : !canStartCurrentFlow &&
+                    jsx.jsx(Button, {
+                      variant: "danger",
+                      onClick: deleteDetectedDraft,
+                      children: "刪除草稿",
+                    }),
+              ],
             }),
           jsx.jsxs("div", {
             className: "form-actions",
@@ -665,6 +666,10 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
     previewStep = isRelative ? 5 : 3,
     wizardSteps = mode === "terminate" ? WizardSteps.terminate : isRelative ? WizardSteps.relative : WizardSteps.intake,
     wizardCurrent = step === previewStep ? wizardSteps.length : mode === "terminate" ? 3 : step + 2;
+  const showPreview = () => {
+    setStep(previewStep);
+    window.requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0 }));
+  };
   const content =
     step === 1 && mode !== "terminate"
     ? jsx.jsxs("section", {
@@ -1038,7 +1043,7 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
                   className: "form-actions",
                   children: [
                     jsx.jsx(Button, { variant: "ghost", onClick: () => setStep(3), children: "上一步" }),
-                    jsx.jsx(Button, { onClick: () => setStep(5), children: "預覽" }),
+                    jsx.jsx(Button, { onClick: showPreview, children: "預覽" }),
                   ],
                 }),
               ],
@@ -1490,7 +1495,7 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
                       if (!counsel) missing.push("counsel");
                       if (missing.length) return setTermInvalidFields(missing);
                     }
-                    setStep(3);
+                    showPreview();
                   },
                   children: isRelative ? "下一步" : "預覽",
                 }),

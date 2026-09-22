@@ -98,6 +98,7 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
     [termsDraft, setTermsDraft] = React.useState(() => BuildTermsDetails(application)),
     [confirmAction, setConfirmAction] = React.useState(null),
     [previewDoc, setPreviewDoc] = React.useState(null),
+    [actingSigners, setActingSigners] = React.useState({ deputyDivisionHead: false, deputyDepartmentHead: false }),
     [attachments, setAttachments] = React.useState([
       { name: "身份證.pdf", time: "2026-07-05 13:59" },
       { name: "近照.jpg", time: "2026-07-05 13:59" },
@@ -108,6 +109,9 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
     mainActions = actions.filter((item) => item.section === "main"),
     documentActions = actions.filter((item) => item.section === "document"),
     notificationActions = actions.filter((item) => item.section === "notification"),
+    isDocumentSigned =
+      !(application.flags || {}).documentsPrinted &&
+      ["已審批", "已通知取件", "完成"].includes(application.status),
     applicantDetails = BuildApplicantDetails(application),
     termsDetails = BuildTermsDetails(application),
     filerDetails = BuildFilerDetails(application),
@@ -585,12 +589,6 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
                         }),
                         jsx.jsxs("div", {
                           children: [
-                            jsx.jsx("span", { children: "與被申請人關係" }),
-                            jsx.jsx("b", { children: filerDetails.relation || "—" }),
-                          ],
-                        }),
-                        jsx.jsxs("div", {
-                          children: [
                             jsx.jsx("span", { children: "性別" }),
                             jsx.jsx("b", { children: filerDetails.gender || "—" }),
                           ],
@@ -623,6 +621,12 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
                           children: [
                             jsx.jsx("span", { children: "電子郵件" }),
                             jsx.jsx("b", { children: filerDetails.email || "—" }),
+                          ],
+                        }),
+                        jsx.jsxs("div", {
+                          children: [
+                            jsx.jsx("span", { children: "與被申請人關係" }),
+                            jsx.jsx("b", { children: filerDetails.relation || "—" }),
                           ],
                         }),
                         jsx.jsxs("div", {
@@ -811,7 +815,10 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
                           jsx.jsx(Button, {
                             variant: "outline",
                             icon: Na,
-                            onClick: () => setPreviewDoc(item),
+                            onClick: () => {
+                              (setActingSigners({ deputyDivisionHead: false, deputyDepartmentHead: false }),
+                                setPreviewDoc(item));
+                            },
                             children: "預覽",
                           }),
                         ],
@@ -894,9 +901,37 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
           children: [
             buildPdfPlaceholder(previewDoc),
             jsx.jsxs("div", {
-              className: "form-actions",
+              className: "form-actions document-preview-actions",
               children: [
-                jsx.jsx("span", {}),
+                !isDocumentSigned &&
+                  jsx.jsxs("div", {
+                    className: "document-signature-options",
+                    children: [
+                      jsx.jsx("span", { className: "document-signature-label", children: "代任簽署：" }),
+                      jsx.jsxs("label", {
+                        children: [
+                          jsx.jsx("input", {
+                            type: "checkbox",
+                            checked: actingSigners.deputyDivisionHead,
+                            onChange: (event) =>
+                              setActingSigners({ ...actingSigners, deputyDivisionHead: event.target.checked }),
+                          }),
+                          "代處長",
+                        ],
+                      }),
+                      jsx.jsxs("label", {
+                        children: [
+                          jsx.jsx("input", {
+                            type: "checkbox",
+                            checked: actingSigners.deputyDepartmentHead,
+                            onChange: (event) =>
+                              setActingSigners({ ...actingSigners, deputyDepartmentHead: event.target.checked }),
+                          }),
+                          "代廳長",
+                        ],
+                      }),
+                    ],
+                  }),
                 jsx.jsx(Button, {
                   variant: "outline",
                   icon: Hd,
