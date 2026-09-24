@@ -27,6 +27,25 @@ function Badge({ children: children }) {
     children: children,
   });
 }
+function InlineSeparatedList({ items: items, empty: empty = "—" }) {
+  const values = (Array.isArray(items) ? items : String(items || "").split("、"))
+    .map((item) => String(item).trim())
+    .filter(Boolean);
+  if (!values.length) return empty;
+  return jsx.jsx("span", {
+    className: "inline-separated-list",
+    children: values.map((item, index) =>
+      jsx.jsxs(
+        "span",
+        {
+          className: "inline-separated-item",
+          children: [item, index < values.length - 1 ? "、" : ""],
+        },
+        `${item}-${index}`,
+      ),
+    ),
+  });
+}
 const containsSelect = (node) => {
   if (!node || typeof node !== "object") return false;
   if (Array.isArray(node)) return node.some(containsSelect);

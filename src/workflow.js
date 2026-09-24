@@ -39,10 +39,10 @@
       message: "已收到補交資料，案件返回初步檢查",
     },
     complete_review: {
-      label: "完成複核並送審",
+      label: "完成複核並上呈主管審批",
       role: ROLES.PROCESSOR,
       section: "main",
-      message: "複核完成，案件已送交主管審批",
+      message: "複核完成，案件已上呈主管審批",
     },
     return_case: {
       label: "退回案件",

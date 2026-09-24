@@ -537,7 +537,9 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
                               jsx.jsxs("div", {
                                 children: [
                                   jsx.jsx("span", { children: "申請禁入之博彩承批公司" }),
-                                  jsx.jsx("b", { children: termsDetails.scope || "—" }),
+                                  jsx.jsx("b", {
+                                    children: jsx.jsx(InlineSeparatedList, { items: termsDetails.scope }),
+                                  }),
                                 ],
                               }),
                               jsx.jsxs("div", {
@@ -555,7 +557,9 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
                               jsx.jsxs("div", {
                                 children: [
                                   jsx.jsx("span", { children: "知悉禁入申請服務途徑" }),
-                                  jsx.jsx("b", { children: termsDetails.referralChannels || "—" }),
+                                  jsx.jsx("b", {
+                                    children: jsx.jsx(InlineSeparatedList, { items: termsDetails.referralChannels }),
+                                  }),
                                 ],
                               }),
                             ],
@@ -710,7 +714,7 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
                           jsx.jsx("textarea", {
                             value: note,
                             onChange: (event) => setNote(event.target.value),
-                            placeholder: "可輸入處理意見，操作後會寫入紀錄",
+                            placeholder: "請輸入處理意見，提交後會寫入紀錄",
                           }),
                           mainActions.length > 0
                             ? jsx.jsx("div", {

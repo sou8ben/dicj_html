@@ -480,6 +480,7 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
     [termInvalidFields, setTermInvalidFields] = React.useState([]),
     [companies, setCompanies] = React.useState(() => (initialDraft && initialDraft.companies) || []),
     [referralChannels, setReferralChannels] = React.useState(() => (initialDraft && initialDraft.referralChannels) || ["朋友"]),
+    [referralOther, setReferralOther] = React.useState(() => (initialDraft && initialDraft.referralOther) || ""),
     [relativeDocType, setRelativeDocType] = React.useState(() => (initialDraft && initialDraft.relativeDocType) || ""),
     [relativeFiles, setRelativeFiles] = React.useState(() => (initialDraft && initialDraft.relativeFiles) || []),
     [relativeReadMethod, setRelativeReadMethod] = React.useState(() => (initialDraft && initialDraft.relativeReadMethod) || ""),
@@ -521,6 +522,8 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
         setEndDate("2027-08-09"),
         setTermInvalidFields([]),
         setCompanies([]),
+        setReferralChannels(["朋友"]),
+        setReferralOther(""),
         setRelativeDocType("澳門居民身份證"),
         setRelativeFiles([{ type: "澳門居民身份證", name: "親屬身份證正面.jpg" }]),
         setRelativeReadMethod(""),
@@ -579,6 +582,7 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
       endDate: endDate,
       companies: companies,
       referralChannels: referralChannels,
+      referralOther: referralOther,
       relative: relative,
     };
   const draftKeyValue = applicant.docType && docNo ? buildDraftKey(applicant.docType, docNo) : null,
@@ -602,6 +606,7 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
       endDate: endDate,
       companies: companies,
       referralChannels: referralChannels,
+      referralOther: referralOther,
       relativeDocType: relativeDocType,
       relativeFiles: relativeFiles,
       relativeReadMethod: relativeReadMethod,
@@ -621,6 +626,7 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
       effectiveDate ||
       endDate ||
       companies.length > 0 ||
+      referralOther ||
       relative.name ||
       relative.docNo,
     draftBodyKey = JSON.stringify([
@@ -636,6 +642,7 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
       endDate,
       companies,
       referralChannels,
+      referralOther,
       relativeDocType,
       relativeFiles,
       relativeReadMethod,
@@ -1362,6 +1369,20 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
                     ),
                   ),
                 }),
+                referralChannels.includes("其他") &&
+                  jsx.jsx("div", {
+                    className: "other-referral-field",
+                    children: jsx.jsx(Field, {
+                      label: "其他途徑",
+                      children: jsx.jsx("input", {
+                        type: "text",
+                        value: referralOther,
+                        placeholder: "請輸入其他途徑",
+                        maxLength: 100,
+                        onChange: (event) => setReferralOther(event.target.value),
+                      }),
+                    }),
+                  }),
               ],
             }),
             jsx.jsxs("div", {
@@ -1667,15 +1688,18 @@ function ApplicationPreviewScreen({ data: data, documents: documents, photoName:
                   className: "summary-grid",
                   children: [
                     jsx.jsxs("div", {
+                      className: "span-full",
                       children: [
                         jsx.jsx("span", { children: "禁入範圍" }),
                         jsx.jsx("b", {
-                          children:
-                            data.scope === "全部"
-                              ? "全部承批公司"
-                              : data.companies.length
-                                ? data.companies.join("、")
-                                : "未指定承批公司",
+                          children: jsx.jsx(InlineSeparatedList, {
+                            items:
+                              data.scope === "全部"
+                                ? ["全部承批公司"]
+                                : data.companies.length
+                                  ? data.companies
+                                  : ["未指定承批公司"],
+                          }),
                         }),
                       ],
                     }),
@@ -1698,9 +1722,16 @@ function ApplicationPreviewScreen({ data: data, documents: documents, photoName:
                       ],
                     }),
                     jsx.jsxs("div", {
+                      className: "span-after-first",
                       children: [
                         jsx.jsx("span", { children: "知悉禁入申請服務途徑" }),
-                        jsx.jsx("b", { children: data.referralChannels.length ? data.referralChannels.join("、") : "—" }),
+                        jsx.jsx("b", {
+                          children: jsx.jsx(InlineSeparatedList, {
+                            items: data.referralChannels.map((channel) =>
+                              channel === "其他" && data.referralOther ? `其他：${data.referralOther}` : channel,
+                            ),
+                          }),
+                        }),
                       ],
                     }),
                   ],

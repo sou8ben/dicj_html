@@ -1115,6 +1115,11 @@ input[type="radio"]:focus-visible {
   gap: 4px 8px;
 }
 
+.other-referral-field {
+  max-width: 420px;
+  margin-top: 14px;
+}
+
 .inline-question {
   align-items: center;
 }
@@ -1355,6 +1360,14 @@ input[type="radio"]:focus-visible {
   min-width: 0;
 }
 
+.summary-grid .span-full {
+  grid-column: 1 / -1;
+}
+
+.summary-grid .span-after-first {
+  grid-column: 2 / -1;
+}
+
 .summary-grid div span {
   margin-bottom: 6px;
   color: var(--text-muted);
@@ -1364,6 +1377,23 @@ input[type="radio"]:focus-visible {
 .summary-grid div b {
   color: var(--text-primary);
   font-size: 16px;
+}
+
+.summary-grid div b .inline-separated-list {
+  display: inline;
+  margin: 0;
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+.summary-grid div b .inline-separated-item {
+  display: inline-block;
+  margin: 0;
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  white-space: nowrap;
 }
 
 .panel-subsection {
