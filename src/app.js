@@ -583,6 +583,7 @@ function FrontendInfoModal({ onClose: onClose }) {
   return jsx.jsx(Modal, {
     title: `版本 ${APP_VERSION} 前端改動`,
     onClose: onClose,
+    className: "frontend-info-modal",
     children: [
       jsx.jsx(
         "div",

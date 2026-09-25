@@ -523,12 +523,12 @@ function PageHeader({ title: title, action: action }) {
 }
 
 /* ---- 7.3 共用元件 Components：模態視窗 Modal ---- */
-function Modal({ title: title, onClose: onClose, children: children, bodyClassName: bodyClassName = "" }) {
+function Modal({ title: title, onClose: onClose, children: children, className: className = "", bodyClassName: bodyClassName = "" }) {
   return jsx.jsx("div", {
     className: "modal-backdrop",
     onMouseDown: onClose,
     children: jsx.jsxs("div", {
-      className: "modal",
+      className: `modal${className ? ` ${className}` : ""}`,
       onMouseDown: (event) => event.stopPropagation(),
       children: [
         jsx.jsxs("div", {

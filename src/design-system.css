@@ -1195,6 +1195,11 @@ input[type="radio"]:focus-visible {
   flex: 0 0 auto;
 }
 
+/* 前端改動彈窗：最小寬度 900px，讓流程說明／文件生成說明表格有足夠寬度 */
+.modal.frontend-info-modal {
+  min-width: 900px;
+}
+
 .frontend-changelog {
   display: grid;
   gap: 20px;
