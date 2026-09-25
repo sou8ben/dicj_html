@@ -1231,6 +1231,197 @@ input[type="radio"]:focus-visible {
   margin-top: 6px;
 }
 
+/* 彈窗分頁：底線式分頁列固定於內容區上方，僅內容區捲動 */
+.modal-tabs {
+  display: flex;
+  gap: 4px;
+  margin: -8px 0 16px;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.modal-tabs button {
+  position: relative;
+  height: 40px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 0;
+  color: var(--text-secondary);
+  background: transparent;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.modal-tabs button:hover,
+.modal-tabs button[aria-selected="true"] {
+  color: var(--brand-700);
+}
+
+.modal-tabs button[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  right: 10px;
+  bottom: -1px;
+  left: 10px;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--brand-700);
+}
+
+/* 流程說明 */
+.workflow-guide {
+  display: grid;
+  gap: 24px;
+}
+
+.workflow-guide section {
+  display: grid;
+  gap: 10px;
+}
+
+.workflow-guide h3 {
+  margin: 0;
+  color: var(--brand-900);
+  font-size: 15px;
+}
+
+.workflow-guide-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.workflow-guide-line li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--brand-800);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.workflow-guide-line li::before {
+  content: "→";
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.workflow-guide-line li:first-child::before {
+  content: none;
+}
+
+.workflow-guide-notes {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.workflow-guide-notes li + li {
+  margin-top: 4px;
+}
+
+.workflow-guide-table table {
+  min-width: 0;
+  width: 100%;
+  font-size: 13px;
+}
+
+.workflow-guide-table th {
+  height: 36px;
+  padding: 0 10px;
+  font-size: 12px;
+  text-align: left;
+}
+
+.workflow-guide-table td {
+  height: auto;
+  padding: 7px 10px;
+  border-bottom: 1px solid #e5ebef;
+  vertical-align: top;
+}
+
+/* 最後一欄是「下一狀態」而非操作欄，取消全域表格的右側固定與右對齊 */
+.workflow-guide-table th:last-child,
+.workflow-guide-table td:last-child {
+  position: static;
+  width: auto;
+  white-space: normal;
+  text-align: left;
+  background: transparent;
+  box-shadow: none;
+}
+
+.workflow-guide-table th:last-child {
+  background: #eef3f6;
+}
+
+/* 說明表格沒有操作欄：取消全域 tr:hover td:last-child 的底色與靠右對齊，懸停時不改變任何欄位 */
+.workflow-guide-table tr:hover td {
+  background: transparent;
+}
+
+.workflow-guide-table tr:hover td:last-child {
+  text-align: left;
+  background: transparent;
+}
+
+.workflow-guide-table td.workflow-guide-status,
+.workflow-guide-table tr:hover td.workflow-guide-status {
+  width: 150px;
+  color: var(--brand-900);
+  background: var(--brand-050);
+  font-weight: 600;
+}
+
+.workflow-guide-status small {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+/* 表格最底一列及最後一組的合併儲存格不畫底線，避免與外框重疊 */
+.workflow-guide-table tbody tr:last-child td,
+.workflow-guide-table td.is-last-group {
+  border-bottom: 0;
+}
+
+.workflow-guide-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  background: var(--brand-050);
+  font-size: 11px;
+  line-height: 18px;
+  vertical-align: 1px;
+}
+
+/* 文件生成說明：狀態欄列出多個狀態，加寬並以完整狀態名稱為換行單位 */
+.document-guide-table td.workflow-guide-status,
+.document-guide-table tr:hover td.workflow-guide-status {
+  width: 220px;
+}
+
+.document-guide-table .inline-separated-item {
+  white-space: nowrap;
+}
+
+.workflow-guide-void {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
 .form-actions {
   display: flex;
   gap: 12px;
@@ -1437,6 +1628,31 @@ input[type="radio"]:focus-visible {
   padding: 20px;
 }
 
+/* 通知及簽收、外部事件模擬：按鈕直排（不依賴 :last-child，模擬面板出現時仍維持） */
+.detail-side .notification-panel,
+.detail-side .simulation-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.detail-side .notification-panel h2,
+.detail-side .simulation-panel h2 {
+  margin-bottom: 5px;
+}
+
+/* 外部事件模擬為演示用途，以虛線外框與正式操作區分 */
+.detail-side .simulation-panel {
+  border: 1px dashed var(--border-strong);
+  background: var(--brand-050);
+  box-shadow: none;
+}
+
+.simulation-panel .readonly-note {
+  margin-top: 0;
+  background: var(--surface-card);
+}
+
 .case-id {
   margin: 4px 0 !important;
   color: var(--text-primary) !important;
@@ -1569,6 +1785,47 @@ input[type="radio"]:focus-visible {
   border-color: #bd3540;
   background: #bd3540;
   box-shadow: 0 0 0 4px #fff0f1;
+}
+
+/* 步驟較多時：圓點居中，奇數步標籤在下、偶數步在上，標籤以圓點為中心 */
+.process-progress.is-dense li {
+  height: 62px;
+  padding: 0;
+}
+
+.process-progress.is-dense li::before {
+  top: 26px;
+}
+
+.process-progress.is-dense li.current::before {
+  top: 25px;
+}
+
+.process-progress.is-dense li::after {
+  top: 31px;
+}
+
+.process-progress.is-dense li > span {
+  position: absolute;
+  top: 44px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.process-progress.is-dense li:nth-child(even) > span {
+  top: 2px;
+}
+
+.process-progress.returned li.current {
+  color: var(--warning-text);
+  border-color: transparent;
+  background: transparent;
+}
+
+.process-progress.returned li.current::before {
+  border-color: #c98a1b;
+  background: #c98a1b;
+  box-shadow: 0 0 0 4px var(--warning-bg);
 }
 
 .timeline {

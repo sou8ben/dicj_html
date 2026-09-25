@@ -216,25 +216,39 @@ function WizardProgress({ current: current, steps: steps }) {
   });
 }
 
+// 一戶通已審批後依取件方式顯示的步驟（與 workflow.js 的分流一致）
+const ONLINE_PICKUP_STEPS = {
+  智取易: ["等待制件", "已制件", "已送出", "送達待取件", "已通知取件", "已取件"],
+  親臨: ["等待制件", "已制件", "已通知取件", "已取件"],
+  電子通知: ["已發送電子通知", "待查閱", "已查閱"],
+};
 function ProcessTimeline({ application: application }) {
-  const stepLabels = application.source === "一戶通"
-      ? ["待處理", "補件處理", "待複核", "待審批", "已審批", "通知取件", "完成"]
+  const isOnline = application.source === "一戶通",
+    pickupSteps = isOnline ? ONLINE_PICKUP_STEPS[getPickupMethod(application)] : [],
+    stepLabels = isOnline
+      ? ["待處理", "補件處理", "待複核", "待審批", "已審批", ...pickupSteps, "完成"]
       : ["待處理", "待審批", "已審批", "完成"],
-    stepIndexByStatus = application.source === "一戶通"
+    // 退回的預設位置：一戶通修正後回到待複核，親臨兩種退回均來自待審批
+    stepIndexByStatus = isOnline
       ? {
           待處理: 0,
           已通知補件: 1,
-          退回: 1,
           待複核: 2,
+          退回: 2,
           待審批: 3,
           已審批: 4,
-          已通知取件: 5,
-          完成: 6,
+          ...Object.fromEntries(pickupSteps.map((status, index) => [status, 5 + index])),
+          完成: stepLabels.length - 1,
         }
-      : { 待處理: 0, 待審批: 1, 退回: 1, 已審批: 2, 完成: 3, 作廢: 3 },
-    currentStepIndex = stepIndexByStatus[application.status] ?? 0,
+      : { 待處理: 0, 待審批: 1, 退回: 1, 已審批: 2, 完成: 3 },
     isCancelled = application.status === "作廢",
-    isReturned = application.status === "退回";
+    isReturned = application.status === "退回",
+    // 作廢及退回案件停在轉入前所在的步驟，以歷程中最後一筆轉入目前狀態的原狀態判定
+    interruptEntry = isCancelled || isReturned
+      ? [...(application.history || [])].reverse().find((entry) => entry.toStatus === application.status)
+      : undefined,
+    progressStatus = interruptEntry ? interruptEntry.fromStatus : application.status,
+    currentStepIndex = stepIndexByStatus[progressStatus] ?? stepIndexByStatus[application.status] ?? 0;
   return jsx.jsxs("div", {
     className: "process-block",
     children: [
@@ -245,7 +259,8 @@ function ProcessTimeline({ application: application }) {
         ],
       }),
       jsx.jsx("ol", {
-        className: `process-progress${isCancelled ? " cancelled" : ""}`,
+        // 超過 7 步（一戶通取件分支）時標籤上下交錯，避免相鄰長標籤重疊
+        className: `process-progress${stepLabels.length > 7 ? " is-dense" : ""}${isCancelled ? " cancelled" : isReturned ? " returned" : ""}`,
         "aria-label": "案件流程進度",
         children: stepLabels.map((label, stepIndex) =>
           jsx.jsx(
@@ -253,12 +268,14 @@ function ProcessTimeline({ application: application }) {
             {
               className: stepIndex < currentStepIndex ? "done" : stepIndex === currentStepIndex ? "current" : "",
               "aria-current": stepIndex === currentStepIndex ? "step" : undefined,
-              children:
-                stepIndex === currentStepIndex && isCancelled
-                  ? "作廢"
-                  : stepIndex === currentStepIndex && isReturned
-                    ? "退回"
-                    : label,
+              children: jsx.jsx("span", {
+                children:
+                  stepIndex === currentStepIndex && isCancelled
+                    ? "作廢"
+                    : stepIndex === currentStepIndex && isReturned
+                      ? "退回"
+                      : label,
+              }),
             },
             label,
           ),
@@ -398,18 +415,9 @@ function SearchFilters({ showParty: showParty = true, onSearch: onSearch }) {
         children: jsx.jsxs(Select, {
           value: draft.status,
           onChange: (event) => updateDraft("status", event.target.value),
-          children: [
-            jsx.jsx("option", { children: "全部" }),
-            jsx.jsx("option", { children: "待處理" }),
-            jsx.jsx("option", { children: "已通知補件" }),
-            jsx.jsx("option", { children: "退回" }),
-            jsx.jsx("option", { children: "待複核" }),
-            jsx.jsx("option", { children: "待審批" }),
-            jsx.jsx("option", { children: "已審批" }),
-            jsx.jsx("option", { children: "已通知取件" }),
-            jsx.jsx("option", { children: "完成" }),
-            jsx.jsx("option", { children: "作廢" }),
-          ],
+          children: ["全部", ...WorkflowStatusOrder].map((status) =>
+            jsx.jsx("option", { children: status }, status),
+          ),
         }),
       }),
       jsx.jsx(Button, { onClick: runSearch, icon: Na, children: "查詢" }),
@@ -427,7 +435,8 @@ function ApplicationsTable({ rows: rows, onOpen: onOpen, actionLabel: actionLabe
           type: (row) => row.type,
           source: (row) => row.source,
           party: (row) => row.party,
-          status: (row) => row.status,
+          // 依流程順序排序；親臨待審批的主管審批階段排在處理人員複核之後
+          status: (row) => statusFlowRank(row.status) + (row.stage === "supervisor_approval" ? 0.5 : 0),
           pickupMethod: (row) => (row.termsDetails && row.termsDetails.pickupMethod) || "親臨",
           time: (row) => row.time,
         }),

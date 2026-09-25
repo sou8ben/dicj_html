@@ -9,7 +9,7 @@ function DashboardScreen({ applications: applications, onOpen: onOpen, role: rol
   const [page, setPage] = React.useState(1),
     [pageSize, setPageSize] = React.useState(10),
     [filterCriteria, setFilterCriteria] = React.useState(null),
-    today = new Date("2026-08-29"),
+    today = new Date(),
     actionable = getActionableApplications(applications, role),
     filteredActionable = React.useMemo(
       () => filterApplicationRows(actionable, filterCriteria),
@@ -20,10 +20,15 @@ function DashboardScreen({ applications: applications, onOpen: onOpen, role: rol
         today.getTime() - new Date(app.time.replace(" ", "T")).getTime() >
         DemoData.slaDays * 864e5,
     ),
-    countsByStatus = actionable.reduce((app, count) => ({ ...app, [count.status]: (app[count.status] || 0) + 1 }), {}),
-    statusSummary = Object.entries(countsByStatus)
-      .map(([app, count]) => `${app} ${count}`)
-      .join(" · ") || "目前沒有待辦案件",
+    // 待辦摘要只列出審批前的狀態（已審批及其後的取件各步不列），依流程順序排列
+    countsByStatus = actionable
+      .filter((app) => statusFlowRank(app.status) < statusFlowRank("已審批"))
+      .reduce((counts, app) => ({ ...counts, [app.status]: (counts[app.status] || 0) + 1 }), {}),
+    statusSummary =
+      Object.entries(countsByStatus)
+        .sort(([statusA], [statusB]) => statusFlowRank(statusA) - statusFlowRank(statusB))
+        .map(([status, count]) => `${status} ${count}`)
+        .join(" · ") || (actionable.length ? "目前沒有審批前的待辦案件" : "目前沒有待辦案件"),
     overdueSummary =
       overdue.length > 0
         ? `最久 ${Math.floor(

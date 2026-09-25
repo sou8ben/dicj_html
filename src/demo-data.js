@@ -37,9 +37,13 @@ const DemoAccounts = [
 
 const dicjWorkflow = window.DICJWorkflow;
 const {
+  ACTIONS: WorkflowActions,
+  PICKUP_METHODS: WorkflowPickupMethods,
   ROLES: WorkflowRoles,
+  STATUS_ORDER: WorkflowStatusOrder,
   getActionableApplications,
   getAvailableActions,
+  getPickupMethod,
   transition: transitionApplication,
 } = dicjWorkflow;
 
@@ -48,7 +52,6 @@ const makeDemoApplication = (application) => ({
   flags: {
     correctionNoticeSent: false,
     processingCompleted: false,
-    documentsPrinted: false,
   },
   history: [
     {
@@ -75,7 +78,6 @@ const makeDemoApplication = (application) => ({
   flags: {
     correctionNoticeSent: false,
     processingCompleted: false,
-    documentsPrinted: false,
     ...(application.flags || {}),
   },
 });
@@ -88,133 +90,181 @@ const padDatePart = (part) => String(part).padStart(2, "0"),
     return `${endDate.getFullYear()}-${padDatePart(endDate.getMonth() + 1)}-${padDatePart(endDate.getDate())} 00:00`;
   })();
 
+/* ---- 演示案件生成：由「待處理」起按流程重放操作，狀態、內部階段、標記及歷程必與 workflow 一致 ----
+ * hoursAgo：相對系統時間的建立時數；steps：依序執行的操作 id，或 [操作 id, 意見]。
+ * 各步操作於建立後每 20 小時執行一次，最後一步不晚於一小時前。 */
+const formatDemoTime = (date) =>
+    `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())} ${padDatePart(date.getHours())}:${padDatePart(date.getMinutes())}`,
+  buildDemoCase = ({ hoursAgo: hoursAgo, steps: steps = [], ...application }) => {
+    const hourMs = 36e5,
+      createdAt = Date.now() - hoursAgo * hourMs,
+      stepGap = steps.length ? Math.min(20 * hourMs, ((hoursAgo - 1) * hourMs) / steps.length) : 0;
+    return steps.reduce(
+      (current, step, index) => {
+        const [actionId, note = ""] = [].concat(step),
+          action = WorkflowActions[actionId];
+        return transitionApplication(current, actionId, action.role || action.roles[0], {
+          time: formatDemoTime(new Date(createdAt + stepGap * (index + 1))),
+          note: note,
+        }).application;
+      },
+      makeDemoApplication({ ...application, status: "待處理", time: formatDemoTime(new Date(createdAt)) }),
+    );
+  };
+
+// 共用流程片段
+const OnlineToApproval = ["submit_initial_review", "complete_review", "approve_sign"],
+  CounterToApproval = ["counter_submit_review", "counter_complete_review", "counter_approve_sign"],
+  // 一戶通審批通過後自動轉入取件分支（智取易／親臨 → 等待制件；電子通知 → 已發送電子通知），各取件方式的後續操作
+  OnlinePickupSteps = {
+    智取易: [
+      "complete_production",
+      "dispatch_to_locker",
+      "simulate_locker_arrival",
+      "send_pickup_notice",
+      "simulate_locker_pickup",
+      "close_case",
+    ],
+    親臨: ["complete_production", "send_pickup_notice", "record_handover", "close_case"],
+    電子通知: ["simulate_notice_delivered", "simulate_notice_read", "close_case"],
+  },
+  // 取件分支：第 n 位申請人停在分支的第 n 步（第 0 位為審批通過後自動轉入的狀態），每個狀態一筆
+  buildPickupBranch = (pickupMethod, applicants) =>
+    applicants.map((applicant, index) =>
+      buildDemoCase({
+        type: "申請",
+        source: "一戶通",
+        party: "本人",
+        notify: "電子通知",
+        termsDetails: { pickupMethod: pickupMethod },
+        ...applicant,
+        steps: [...OnlineToApproval, ...OnlinePickupSteps[pickupMethod].slice(0, index)],
+      }),
+    );
+
 const DemoData = {
   roles: ["櫃枱人員", "處理人員", "主管", "系統管理員"],
   accounts: DemoAccounts,
   // 超時未審批判定天數（SLA）
   slaDays: 3,
+  // 列表順序：一戶通在前、親臨在後，各自按流程順序排列；一戶通審批後依取件方式分為三條分支，每個狀態一筆
   applications: [
-    makeDemoApplication({
-      id: "110/DICJ/2026",
+    /* ---- 一戶通：收件至審批 ---- */
+    buildDemoCase({
+      id: "130/DICJ/2026",
       name: "梁志明",
       type: "申請",
       source: "一戶通",
       party: "本人",
-      status: "待處理",
       notify: "電子通知",
-      time: "2026-08-26 09:18",
-      termsDetails: { pickupMethod: "電子方式" },
+      termsDetails: { pickupMethod: "電子通知" },
+      hoursAgo: 3,
     }),
-    makeDemoApplication({
-      id: "109/DICJ/2026",
+    buildDemoCase({
+      id: "129/DICJ/2026",
       name: "黃美玲",
       type: "申請",
       source: "一戶通",
       party: "本人",
-      status: "已通知補件",
       notify: "電子通知",
-      time: "2026-08-25 16:42",
-      termsDetails: { pickupMethod: "郵寄" },
+      termsDetails: { pickupMethod: "智取易" },
+      hoursAgo: 100,
+      steps: [["confirm_missing", "缺少身份證副本及近照"]],
     }),
-    makeDemoApplication({
-      id: "108/DICJ/2026",
-      name: "郭子健",
-      type: "廢止",
-      source: "一戶通",
-      party: "本人",
-      status: "已通知補件",
-      notify: "電子通知",
-      time: "2026-08-25 11:26",
-      termsDetails: { pickupMethod: "電子方式" },
-    }),
-    makeDemoApplication({
-      id: "107/DICJ/2026",
+    buildDemoCase({
+      id: "128/DICJ/2026",
       name: "蘇麗華",
       type: "申請",
       source: "一戶通",
       party: "本人",
-      status: "待複核",
       notify: "電子通知",
-      time: "2026-08-24 14:05",
       termsDetails: { pickupMethod: "親臨" },
+      hoursAgo: 26,
+      steps: ["submit_initial_review"],
     }),
-    makeDemoApplication({
-      id: "106/DICJ/2026",
+    buildDemoCase({
+      id: "127/DICJ/2026",
       name: "林國強",
       type: "申請",
       source: "一戶通",
       party: "本人",
-      status: "待審批",
       notify: "電子通知",
-      time: "2026-08-23 10:20",
-      termsDetails: { pickupMethod: "電子方式" },
+      termsDetails: { pickupMethod: "電子通知" },
+      hoursAgo: 50,
+      steps: ["submit_initial_review", "complete_review"],
     }),
-    makeDemoApplication({
-      id: "105/DICJ/2026",
+    // 退回（處理人員複核退回，待發修正通知）
+    buildDemoCase({
+      id: "126/DICJ/2026",
+      name: "郭子健",
+      type: "廢止",
+      source: "一戶通",
+      party: "本人",
+      notify: "電子通知",
+      termsDetails: { pickupMethod: "電子通知" },
+      hoursAgo: 60,
+      steps: ["submit_initial_review", ["return_case", "申請表簽名與身份證明文件不符"]],
+    }),
+    // 退回（主管要求退回，已發修正通知，待確認補交）
+    buildDemoCase({
+      id: "125/DICJ/2026",
       name: "陳小燕",
       type: "續期",
       source: "一戶通",
       party: "本人",
-      status: "退回",
       notify: "電子通知",
-      time: "2026-08-22 15:36",
-      termsDetails: { pickupMethod: "郵寄" },
+      termsDetails: { pickupMethod: "智取易" },
+      hoursAgo: 96,
+      steps: [
+        "submit_initial_review",
+        "complete_review",
+        ["request_return", "禁入期限與申請表不符，請申請人確認"],
+        "send_correction_notice",
+      ],
     }),
-    makeDemoApplication({
-      id: "104/DICJ/2026",
-      name: "何志雄",
-      type: "申請",
-      source: "一戶通",
-      party: "本人",
-      status: "已審批",
-      notify: "電子通知",
-      time: "2026-08-21 09:42",
-      termsDetails: { pickupMethod: "親臨" },
-    }),
-    makeDemoApplication({
-      id: "103/DICJ/2026",
-      name: "麥美儀",
-      type: "申請",
-      source: "一戶通",
-      party: "本人",
-      status: "已通知取件",
-      flags: { documentsPrinted: true, processingCompleted: true },
-      notify: "電子通知",
-      time: "2026-08-20 12:12",
-      termsDetails: { pickupMethod: "電子方式" },
-    }),
-    makeDemoApplication({
-      id: "102/DICJ/2026",
-      name: "羅家明",
-      type: "申請",
-      source: "一戶通",
-      party: "本人",
-      status: "完成",
-      flags: { documentsPrinted: true, processingCompleted: true },
-      notify: "電子通知",
-      time: "2026-08-19 10:08",
-      termsDetails: { pickupMethod: "郵寄" },
-    }),
-    makeDemoApplication({
-      id: "101/DICJ/2026",
+    /* ---- 一戶通取件：智取易（審批通過 → 等待制件 → 已制件 → 已送出 → 送達待取件 → 已通知取件 → 已取件 → 完成）---- */
+    ...buildPickupBranch("智取易", [
+      { id: "124/DICJ/2026", name: "黃子朗", hoursAgo: 36 },
+      { id: "123/DICJ/2026", name: "何美琪", hoursAgo: 40 },
+      { id: "122/DICJ/2026", name: "劉建邦", hoursAgo: 44 },
+      { id: "121/DICJ/2026", name: "梁嘉儀", hoursAgo: 48 },
+      { id: "120/DICJ/2026", name: "麥美儀", hoursAgo: 54 },
+      { id: "119/DICJ/2026", name: "譚志偉", hoursAgo: 60 },
+      { id: "118/DICJ/2026", name: "羅家明", hoursAgo: 200 },
+    ]),
+    /* ---- 一戶通取件：親臨（審批通過 → 等待制件 → 已制件 → 已通知取件 → 已取件 → 完成）---- */
+    ...buildPickupBranch("親臨", [
+      { id: "117/DICJ/2026", name: "趙文傑", hoursAgo: 38 },
+      { id: "116/DICJ/2026", name: "楊淑儀", type: "續期", hoursAgo: 42 },
+      { id: "115/DICJ/2026", name: "馬俊傑", hoursAgo: 50 },
+      { id: "114/DICJ/2026", name: "鍾美華", hoursAgo: 58 },
+      { id: "113/DICJ/2026", name: "葉志明", hoursAgo: 180 },
+    ]),
+    /* ---- 一戶通取件：電子通知（審批通過 → 已發送電子通知 → 待查閱 → 已查閱 → 完成）---- */
+    ...buildPickupBranch("電子通知", [
+      { id: "112/DICJ/2026", name: "潘家樂", hoursAgo: 34 },
+      { id: "111/DICJ/2026", name: "盧詩敏", type: "廢止", hoursAgo: 40 },
+      { id: "110/DICJ/2026", name: "韋俊賢", hoursAgo: 46 },
+      { id: "109/DICJ/2026", name: "高詠芝", hoursAgo: 150 },
+    ]),
+    /* ---- 親臨 ---- */
+    buildDemoCase({
+      id: "108/DICJ/2026",
       name: "區麗珊",
       type: "申請",
       source: "親臨",
       party: "本人",
-      status: "待處理",
       notify: "短信",
-      time: "2026-08-26 13:24",
+      hoursAgo: 1.5,
     }),
-    makeDemoApplication({
-      id: "100/DICJ/2026",
+    // 待審批（處理人員複核）
+    buildDemoCase({
+      id: "107/DICJ/2026",
       name: "周永康",
       type: "申請",
       source: "親臨",
       party: "親屬",
-      status: "待審批",
-      stage: "processor_review",
       notify: "短信",
-      time: "2026-08-25 10:18",
       filerDetails: {
         name: "周麗雯",
         foreignName: "CHAO LAI MAN",
@@ -227,27 +277,42 @@ const DemoData = {
         email: "chao.lm@example.com",
         address: "澳門筷子基北灣大馬路12號",
       },
+      hoursAgo: 20,
+      steps: ["counter_submit_review"],
     }),
-    makeDemoApplication({
-      id: "099/DICJ/2026",
+    // 待審批（主管審批）
+    buildDemoCase({
+      id: "106/DICJ/2026",
       name: "李嘉欣",
       type: "申請",
       source: "親臨",
       party: "本人",
-      status: "待審批",
-      stage: "supervisor_approval",
       notify: "短信",
-      time: "2026-08-24 16:09",
+      hoursAgo: 45,
+      steps: ["counter_submit_review", "counter_complete_review"],
     }),
-    makeDemoApplication({
-      id: "098/DICJ/2026",
+    buildDemoCase({
+      id: "105/DICJ/2026",
+      name: "吳家豪",
+      type: "續期",
+      source: "親臨",
+      party: "本人",
+      notify: "短信",
+      hoursAgo: 75,
+      steps: [
+        "counter_submit_review",
+        "counter_complete_review",
+        ["counter_request_return", "禁入範圍與申請人聲明不一致，請補正申請表"],
+      ],
+    }),
+    // 已審批（待處理人員完成案件處理）
+    buildDemoCase({
+      id: "104/DICJ/2026",
       name: "馮少芬",
       type: "續期",
       source: "親臨",
       party: "親屬",
-      status: "已審批",
       notify: "短信",
-      time: "2026-08-23 11:31",
       filerDetails: {
         name: "馮建邦",
         foreignName: "FONG KIN PONG",
@@ -260,27 +325,39 @@ const DemoData = {
         email: "fong.kp@example.com",
         address: "澳門台山巴波沙大馬路56號",
       },
+      hoursAgo: 52,
+      steps: CounterToApproval,
     }),
-    makeDemoApplication({
-      id: "097/DICJ/2026",
+    // 已審批（已完成案件處理，待記錄領取）
+    buildDemoCase({
+      id: "103/DICJ/2026",
+      name: "陳志華",
+      type: "申請",
+      source: "親臨",
+      party: "本人",
+      notify: "短信",
+      hoursAgo: 90,
+      steps: [...CounterToApproval, "complete_processing"],
+    }),
+    buildDemoCase({
+      id: "102/DICJ/2026",
       name: "林國強",
       type: "廢止",
       source: "親臨",
       party: "本人",
-      status: "完成",
-      flags: { documentsPrinted: true, processingCompleted: true },
       notify: "電子通知",
-      time: "2026-08-22 10:20",
+      hoursAgo: 170,
+      steps: [...CounterToApproval, "complete_processing", "counter_record_handover"],
     }),
-    makeDemoApplication({
-      id: "096/DICJ/2026",
+    buildDemoCase({
+      id: "101/DICJ/2026",
       name: "鄭文浩",
       type: "申請",
       source: "親臨",
       party: "本人",
-      status: "作廢",
       notify: "短信",
-      time: "2026-08-18 09:35",
+      hoursAgo: 230,
+      steps: ["counter_submit_review", ["void_case", "申請人撤回申請"]],
     }),
   ],
   sanctions: [

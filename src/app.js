@@ -28,8 +28,30 @@ const NAV_ITEMS = [
   { label: "帳號管理", id: "accounts", icon: Nd },
   { label: "操作日誌", id: "logs", icon: W8 },
 ];
-const APP_VERSION = "2026.09.24 12:44PM";
+const APP_VERSION = "2026.09.25 05:03PM";
 const FRONTEND_CHANGELOG = [
+  {
+    title: "2026.09.25 更新內容",
+    items: [
+      "工作台「項待辦」下方的狀態摘要只列出審批前的狀態（待處理、已通知補件、待複核、待審批、退回），並依流程順序排列；待辦總數維持計算全部待辦案件。",
+      "一戶通案件「已通知補件」後，申請人於一戶通補件即由系統自動確認收到補交資料並返回「待處理」，移除櫃枱的「確認收到補交資料」按鈕；",
+      "移除親臨案件的「列印通知書／公函」步驟及文件的「已列印」「已簽署，待列印」狀態：親臨案件已審批後，處理人員完成案件處理即可記錄領取及簽收；文件審批後一律顯示「已簽署」，仍可於預覽視窗打印或下載。",
+      "列印文件只在一戶通案件列出申請表、聲明書（親臨案件只列公函、通知書、批示）；作廢案件不提供任何列印文件。",
+      "一戶通退回案件的案件處理意見欄提示改為「請輸入補件意見，提交後會寫入紀錄並於一戶通顯示」。",
+      "一戶通案件審批通過後不再停留於「已審批」，由系統依取件方式自動轉入取件分支，操作紀錄保留主管審批及系統自動轉移兩筆：智取易（等待制件 → 已制件 → 已送出 → 送達待取件 → 已通知取件 → 已取件 → 完成）、親臨（等待制件 → 已制件 → 已通知取件 → 已取件 → 完成）、電子通知（已發送電子通知 → 待查閱 → 已查閱 → 完成）；一戶通不再設「完成案件處理」步驟。",
+      "案件詳情新增「外部事件模擬」面板，以演示按鈕代替智取易送達、申請人取件、電子通知送達及申請人查閱等外部系統事件。",
+      "一戶通案件的案件流程依取件方式顯示對應的取件步驟；步驟較多時標籤改為上下交錯排列，避免相鄰長標籤重疊。",
+      "作廢案件的案件流程改為停在作廢前所在的步驟，不再把後續步驟標示為已完成。",
+      "一戶通退回案件的案件流程改為停在退回發生的步驟（待複核或待審批），並以琥珀色標示「退回」，與作廢的紅色區分。",
+      "親臨案件於「待審批」而未記錄內部階段時，視為處理人員複核，避免案件無人可操作。",
+      "親臨案件「已審批」階段的負責角色依案件處理進度更新（流程模組邏輯，畫面暫不顯示）。",
+      "文件是否已簽署改以案件狀態判定（已審批及其後各步）；已簽署或已作廢案件的文件預覽不再顯示「代任簽署」選項。",
+      "申請管理示範案件改為按流程生成：一戶通（收件至審批，以及智取易、親臨、電子通知三條取件分支）在前、親臨在後，每個狀態／子狀態一筆，歷程由實際流程操作重放產生，申請時間相對系統時間計算。",
+      "申請列表的「狀態」欄排序及狀態篩選選項改按流程順序排列。",
+      "工作台超時統計改以系統日期計算，臨櫃新建案件的申請時間改為實際建立時間。",
+      "前端改動彈窗新增「更新內容／流程說明」分頁；流程說明列出一戶通收件至審批、智取易／親臨／電子通知三條取件分支及親臨（臨櫃）流程的主線、要點、各狀態可用操作與下一狀態，以及共通規則，轉換表由流程規則即時推導。",
+    ],
+  },
   {
     title: "2026.09.24 更新內容",
     items: [
@@ -118,6 +140,516 @@ items: [
   },
   
 ];
+
+/* ----------------------------------------------------------------
+ * 流程說明 Workflow Guide（前端改動彈窗「流程說明」分頁）
+ * 主線與要點為說明文字；狀態轉換表由 workflow.js 即時推導，流程規則改動時自動同步。
+ * scenarios 列出每個可操作的狀態／子狀態，flags、stage、pickupMethod 用於重現該子狀態。
+ * ---------------------------------------------------------------- */
+const WORKFLOW_GUIDE = [
+  {
+    source: "一戶通",
+    title: "一戶通流程：收件至審批",
+    mainLine: ["待處理", "待複核", "待審批", "已審批"],
+    notes: [
+      "首次補件循環：待處理 → 已通知補件 → 申請人於一戶通補件後，系統自動確認收到補交資料並返回待處理，櫃枱人員無需操作；與審核中的退回分開處理。",
+      "退回循環：待複核或待審批退回後，須先發送修正通知，再確認補交並重新送複核。",
+      "審批通過後不停留在「已審批」，由系統依申請人選擇的取件方式自動轉入下一步：智取易、親臨 → 等待制件；電子通知 → 已發送電子通知。",
+      "一戶通案件不提供作廢（業務設計）。",
+    ],
+    scenarios: [
+      { status: "待處理" },
+      { status: "已通知補件" },
+      { status: "待複核" },
+      { status: "待審批" },
+      { status: "退回", note: "未發修正通知" },
+      { status: "退回", note: "已發修正通知", flags: { correctionNoticeSent: true } },
+    ],
+  },
+  {
+    source: "一戶通",
+    pickupMethod: "智取易",
+    title: "一戶通取件：智取易",
+    mainLine: ["已審批", "等待制件", "已制件", "已送出", "送達待取件", "已通知取件", "已取件", "完成"],
+    notes: [
+      "審批通過後由系統自動送交制件，案件轉入「等待制件」。",
+      "「模擬智取易送達」「模擬申請人於智取易取件」為演示用按鈕，代替智取易系統回傳的事件。",
+    ],
+    scenarios: [
+      { status: "等待制件" },
+      { status: "已制件" },
+      { status: "已送出" },
+      { status: "送達待取件" },
+      { status: "已通知取件" },
+      { status: "已取件" },
+    ],
+  },
+  {
+    source: "一戶通",
+    pickupMethod: "親臨",
+    title: "一戶通取件：親臨",
+    mainLine: ["已審批", "等待制件", "已制件", "已通知取件", "已取件", "完成"],
+    notes: [
+      "審批通過後由系統自動送交制件，案件轉入「等待制件」。",
+      "制件完成後直接發送取件通知，申請人到櫃枱領取時記錄交件及簽收。",
+    ],
+    scenarios: [{ status: "等待制件" }, { status: "已制件" }, { status: "已通知取件" }, { status: "已取件" }],
+  },
+  {
+    source: "一戶通",
+    pickupMethod: "電子通知",
+    title: "一戶通取件：電子通知",
+    mainLine: ["已審批", "已發送電子通知", "待查閱", "已查閱", "完成"],
+    notes: [
+      "審批通過後由系統自動發送電子通知，案件轉入「已發送電子通知」。",
+      "「模擬電子通知送達」「模擬申請人查閱」為演示用按鈕，代替一戶通系統回傳的事件。",
+    ],
+    scenarios: [{ status: "已發送電子通知" }, { status: "待查閱" }, { status: "已查閱" }],
+  },
+  {
+    source: "親臨",
+    title: "親臨（臨櫃）流程",
+    mainLine: ["待處理", "待審批", "已審批", "完成"],
+    notes: [
+      "「待審批」內部分為處理人員複核及主管審批兩個階段，列表只顯示「待審批」。",
+      "退回後由櫃枱確認補正並重新送複核，不需先發修正通知。",
+      "已審批由處理人員完成案件處理後，櫃枱即可記錄領取及簽收（不設列印步驟，文件可於預覽視窗打印）。",
+    ],
+    scenarios: [
+      { status: "待處理" },
+      { status: "待審批", note: "處理人員複核", stage: "processor_review" },
+      { status: "待審批", note: "主管審批", stage: "supervisor_approval" },
+      { status: "退回" },
+      { status: "已審批", note: "未完成案件處理" },
+      { status: "已審批", note: "已完成案件處理", flags: { processingCompleted: true } },
+    ],
+  },
+];
+const WORKFLOW_GUIDE_RULES = [
+  "系統管理員可執行所有操作，不受操作角色限制。",
+  "完成、作廢為終止狀態，不再有任何操作。",
+  "目前角色對案件有可用操作時，案件即列入工作台「待辦申請」。",
+  "每次操作都會記錄操作角色、操作名稱、原狀態、新狀態、時間及意見。",
+];
+const WORKFLOW_GUIDE_FLAG_KEYS = ["correctionNoticeSent", "processingCompleted"];
+function describeGuideScenario(scenario) {
+  return scenario.note ? `${scenario.status}（${scenario.note}）` : scenario.status;
+}
+function matchesGuideScenario(application, scenario) {
+  return (
+    application.status === scenario.status &&
+    (scenario.stage || null) === (application.stage || null) &&
+    WORKFLOW_GUIDE_FLAG_KEYS.every(
+      (key) => Boolean((scenario.flags || {})[key]) === Boolean((application.flags || {})[key]),
+    )
+  );
+}
+function buildWorkflowGuideRows(guide) {
+  const toApplication = (scenario) => ({
+      source: guide.source,
+      status: scenario.status,
+      stage: scenario.stage || null,
+      flags: { ...(scenario.flags || {}) },
+      termsDetails: guide.pickupMethod ? { pickupMethod: guide.pickupMethod } : {},
+      history: [],
+    }),
+    // 下一狀態先在本段找完全相符的子狀態，再找同來源其他段（如審批後轉入取件分支），最後只比對狀態
+    sameSourceScenarios = WORKFLOW_GUIDE.filter((item) => item.source === guide.source).flatMap(
+      (item) => item.scenarios,
+    ),
+    describeApplication = (application) => {
+      const scenario =
+        guide.scenarios.find((item) => matchesGuideScenario(application, item)) ||
+        sameSourceScenarios.find((item) => matchesGuideScenario(application, item)) ||
+        guide.scenarios.find((item) => item.status === application.status);
+      return scenario ? describeGuideScenario(scenario) : application.status;
+    },
+    // 一戶通未分取件方式的段落（收件至審批）：逐一取件方式推導，結果不同時分別列出（如審批通過後的自動分流）
+    describeNext = (application, actionId) => {
+      if (guide.source !== "一戶通" || guide.pickupMethod) {
+        return describeApplication(transitionApplication(application, actionId, WorkflowRoles.ADMIN).application);
+      }
+      const methodsByLabel = new Map();
+      Object.values(WorkflowPickupMethods).forEach((pickupMethod) => {
+        const next = transitionApplication(
+          { ...application, termsDetails: { pickupMethod: pickupMethod } },
+          actionId,
+          WorkflowRoles.ADMIN,
+        ).application;
+        const label = describeApplication(next);
+        methodsByLabel.set(label, [...(methodsByLabel.get(label) || []), pickupMethod]);
+      });
+      return methodsByLabel.size === 1
+        ? [...methodsByLabel.keys()][0]
+        : [...methodsByLabel].map(([label, methods]) => `${methods.join("、")}：${label}`).join("／");
+    },
+    voidableStatuses = [];
+  const rows = guide.scenarios.map((scenario) => {
+    const application = toApplication(scenario),
+      available = getAvailableActions(application, WorkflowRoles.ADMIN);
+    // 作廢適用於多個狀態，另於表格下方統一說明
+    if (available.some((action) => action.id === "void_case") && !voidableStatuses.includes(scenario.status)) {
+      voidableStatuses.push(scenario.status);
+    }
+    return {
+      status: scenario.status,
+      note: scenario.note || "",
+      actions: available
+        .filter((action) => action.id !== "void_case")
+        .map((action) => ({
+          id: action.id,
+          label: action.label,
+          isSimulated: action.section === "simulation",
+          roles: (action.role ? [action.role] : action.roles || []).join("、"),
+          next: describeNext(application, action.id),
+        })),
+    };
+  });
+  const voidAction = WorkflowActions.void_case;
+  return {
+    rows: rows,
+    voidNote: voidableStatuses.length
+      ? `「${voidAction.label}」（${voidAction.roles.join("、")}）：${voidableStatuses.join("、")} 均可執行，執行後轉為「作廢」。`
+      : "",
+  };
+}
+function WorkflowGuidePanel() {
+  const guides = React.useMemo(
+    () => WORKFLOW_GUIDE.map((guide) => ({ ...guide, ...buildWorkflowGuideRows(guide) })),
+    [],
+  );
+  return jsx.jsxs("div", {
+    className: "workflow-guide",
+    children: [
+      ...guides.map((guide) =>
+        jsx.jsxs(
+          "section",
+          {
+            children: [
+              jsx.jsx("h3", { children: guide.title }),
+              jsx.jsx("ol", {
+                className: "workflow-guide-line",
+                "aria-label": `${guide.title}主線`,
+                children: guide.mainLine.map((status) => jsx.jsx("li", { children: status }, status)),
+              }),
+              jsx.jsx("ul", {
+                className: "workflow-guide-notes",
+                children: guide.notes.map((note) => jsx.jsx("li", { children: note }, note)),
+              }),
+              jsx.jsx("div", {
+                className: "table-wrap workflow-guide-table",
+                children: jsx.jsxs("table", {
+                  children: [
+                    jsx.jsx("thead", {
+                      children: jsx.jsxs("tr", {
+                        children: [
+                          jsx.jsx("th", { children: "目前狀態" }),
+                          jsx.jsx("th", { children: "操作" }),
+                          jsx.jsx("th", { children: "操作角色" }),
+                          jsx.jsx("th", { children: "下一狀態" }),
+                        ],
+                      }),
+                    }),
+                    jsx.jsx("tbody", {
+                      children: guide.rows.flatMap((row, rowIndex) =>
+                        row.actions.map((action, actionIndex) =>
+                          jsx.jsxs(
+                            "tr",
+                            {
+                              children: [
+                                actionIndex === 0 &&
+                                  jsx.jsxs("td", {
+                                    rowSpan: row.actions.length,
+                                    className: `workflow-guide-status${rowIndex === guide.rows.length - 1 ? " is-last-group" : ""}`,
+                                    children: [row.status, row.note && jsx.jsx("small", { children: row.note })],
+                                  }),
+                                jsx.jsxs("td", {
+                                  children: [
+                                    action.label,
+                                    action.isSimulated &&
+                                      jsx.jsx("span", { className: "workflow-guide-tag", children: "演示模擬" }),
+                                  ],
+                                }),
+                                jsx.jsx("td", { children: action.roles }),
+                                jsx.jsx("td", { children: action.next }),
+                              ],
+                            },
+                            `${rowIndex}-${action.id}`,
+                          ),
+                        ),
+                      ),
+                    }),
+                  ],
+                }),
+              }),
+              guide.voidNote && jsx.jsx("p", { className: "workflow-guide-void", children: guide.voidNote }),
+            ],
+          },
+          guide.title,
+        ),
+      ),
+      jsx.jsxs("section", {
+        children: [
+          jsx.jsx("h3", { children: "共通規則" }),
+          jsx.jsx("ul", {
+            className: "workflow-guide-notes",
+            children: WORKFLOW_GUIDE_RULES.map((rule) => jsx.jsx("li", { children: rule }, rule)),
+          }),
+        ],
+      }),
+    ],
+  });
+}
+/* ----------------------------------------------------------------
+ * 文件生成說明 Document Guide（前端改動彈窗「文件生成說明」分頁）
+ * 各狀態的文件狀態表由流程規則推導：從「待處理」起走遍每個來源可到達的狀態（一戶通逐一取件方式），
+ * 以 getCaseDocuments 取得各狀態的文件清單與狀態，連續相同者合併為一列。其餘段落為說明文字。
+ * ---------------------------------------------------------------- */
+const DOCUMENT_GUIDE_ORIGINS = [
+  ["申請表、聲明書", "申請人於一戶通提交申請時建立，只有一戶通案件才有；親臨案件不列出。審批前顯示「已建立」。"],
+  ["公函、通知書、批示", "主管「審批通過並雲簽」時完成雲簽。審批前顯示「未簽署」，審批後（已審批及其後各步）顯示「已簽署」。"],
+  ["作廢案件", "不提供任何列印文件，列印文件區只顯示「案件已作廢，不提供列印文件。」。"],
+];
+const DOCUMENT_GUIDE_OUTPUT_RULES = [
+  "每份文件均可「預覽」，不限案件狀態及角色。",
+  "代任簽署：文件未簽署（審批前）時，預覽視窗可勾選「代處長」「代廳長」；已簽署或作廢案件不顯示。每次開啟預覽會重設，勾選結果目前不寫入文件、不保存（演示）。",
+  "打印：開啟瀏覽器列印對話框；下載：存為「{文件名}_{案件編號}.html」。文件內容包括文件名稱、案件編號、申請人、申請類型、來源及申請時間。",
+  "打印及下載只輸出文件，不改變案件狀態、不寫入操作紀錄；流程不設列印步驟，亦沒有「已列印」狀態。",
+];
+// 從待處理起以系統管理員身分走遍所有可用操作，收集該來源可到達的狀態（含自動轉移經過的已審批）
+function collectReachableStatuses(source) {
+  const pickupMethods = source === "一戶通" ? Object.values(WorkflowPickupMethods) : [undefined],
+    statuses = new Set(),
+    stateKey = (application) =>
+      JSON.stringify([
+        application.status,
+        application.stage || null,
+        Object.keys(application.flags || {}).filter((key) => application.flags[key]).sort(),
+      ]);
+  pickupMethods.forEach((pickupMethod) => {
+    const visited = new Set(),
+      queue = [
+        {
+          source: source,
+          status: "待處理",
+          stage: null,
+          flags: {},
+          termsDetails: pickupMethod ? { pickupMethod: pickupMethod } : {},
+          history: [],
+        },
+      ];
+    while (queue.length) {
+      const application = queue.shift(),
+        key = stateKey(application);
+      if (visited.has(key)) continue;
+      visited.add(key);
+      statuses.add(application.status);
+      getAvailableActions(application, WorkflowRoles.ADMIN).forEach((action) => {
+        const next = transitionApplication(application, action.id, WorkflowRoles.ADMIN).application;
+        next.history.forEach((entry) => statuses.add(entry.toStatus));
+        queue.push({ ...next, history: [] });
+      });
+    }
+  });
+  return [...statuses].sort((a, b) => statusFlowRank(a) - statusFlowRank(b));
+}
+function buildDocumentGuideRows(source) {
+  return collectReachableStatuses(source).reduce((rows, status) => {
+    const documents = getCaseDocuments({ source: source, status: status }),
+      signature = JSON.stringify(documents),
+      lastRow = rows[rows.length - 1];
+    if (lastRow && lastRow.signature === signature) lastRow.statuses.push(status);
+    else rows.push({ statuses: [status], documents: documents, signature: signature });
+    return rows;
+  }, []);
+}
+function DocumentGuidePanel() {
+  const sources = React.useMemo(
+    () =>
+      ["一戶通", "親臨"].map((source) => {
+        const rows = buildDocumentGuideRows(source),
+          documentNames = [
+            ...new Set(rows.flatMap((row) => row.documents.map((caseDocument) => caseDocument.name))),
+          ];
+        return { source: source, rows: rows, documentNames: documentNames };
+      }),
+    [],
+  );
+  return jsx.jsxs("div", {
+    className: "workflow-guide",
+    children: [
+      jsx.jsxs("section", {
+        children: [
+          jsx.jsx("h3", { children: "文件由來" }),
+          jsx.jsx("ul", {
+            className: "workflow-guide-notes",
+            children: DOCUMENT_GUIDE_ORIGINS.map(([title, text]) =>
+              jsx.jsxs("li", { children: [jsx.jsx("b", { children: `${title}：` }), text] }, title),
+            ),
+          }),
+        ],
+      }),
+      ...sources.map((item) =>
+        jsx.jsxs(
+          "section",
+          {
+            children: [
+              jsx.jsx("h3", { children: `${item.source}案件：各狀態的文件狀態` }),
+              jsx.jsx("div", {
+                className: "table-wrap workflow-guide-table document-guide-table",
+                children: jsx.jsxs("table", {
+                  children: [
+                    jsx.jsx("thead", {
+                      children: jsx.jsxs("tr", {
+                        children: [
+                          jsx.jsx("th", { children: "案件狀態" }),
+                          ...item.documentNames.map((name) => jsx.jsx("th", { children: name }, name)),
+                        ],
+                      }),
+                    }),
+                    jsx.jsx("tbody", {
+                      children: item.rows.map((row, rowIndex) =>
+                        jsx.jsxs(
+                          "tr",
+                          {
+                            children: [
+                              jsx.jsx("td", {
+                                className: `workflow-guide-status${rowIndex === item.rows.length - 1 ? " is-last-group" : ""}`,
+                                children: jsx.jsx(InlineSeparatedList, { items: row.statuses }),
+                              }),
+                              ...(row.documents.length === 0
+                                ? [
+                                    jsx.jsx(
+                                      "td",
+                                      { colSpan: item.documentNames.length, children: "不提供列印文件" },
+                                      "none",
+                                    ),
+                                  ]
+                                : item.documentNames.map((name) =>
+                                    jsx.jsx(
+                                      "td",
+                                      {
+                                        children:
+                                          (row.documents.find((caseDocument) => caseDocument.name === name) || {})
+                                            .statusText || "—",
+                                      },
+                                      name,
+                                    ),
+                                  )),
+                            ],
+                          },
+                          row.statuses[0],
+                        ),
+                      ),
+                    }),
+                  ],
+                }),
+              }),
+            ],
+          },
+          item.source,
+        ),
+      ),
+      jsx.jsxs("section", {
+        children: [
+          jsx.jsx("h3", { children: "預覽、打印與下載" }),
+          jsx.jsx("ul", {
+            className: "workflow-guide-notes",
+            children: DOCUMENT_GUIDE_OUTPUT_RULES.map((rule) => jsx.jsx("li", { children: rule }, rule)),
+          }),
+        ],
+      }),
+    ],
+  });
+}
+/* ---- 前端改動彈窗：更新內容／流程說明／文件生成說明分頁 ---- */
+const FRONTEND_INFO_TABS = [
+  { id: "changelog", label: "更新內容" },
+  { id: "workflow", label: "流程說明" },
+  { id: "documents", label: "文件生成說明" },
+];
+function FrontendInfoModal({ onClose: onClose }) {
+  const [activeTab, setActiveTab] = React.useState("changelog"),
+    tabRefs = React.useRef({}),
+    handleTabKeyDown = (event) => {
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      event.preventDefault();
+      const currentIndex = FRONTEND_INFO_TABS.findIndex((tab) => tab.id === activeTab),
+        offset = event.key === "ArrowRight" ? 1 : -1,
+        nextTab = FRONTEND_INFO_TABS[(currentIndex + offset + FRONTEND_INFO_TABS.length) % FRONTEND_INFO_TABS.length];
+      setActiveTab(nextTab.id);
+      tabRefs.current[nextTab.id] && tabRefs.current[nextTab.id].focus();
+    };
+  return jsx.jsx(Modal, {
+    title: `版本 ${APP_VERSION} 前端改動`,
+    onClose: onClose,
+    children: [
+      jsx.jsx(
+        "div",
+        {
+          className: "modal-tabs",
+          role: "tablist",
+          "aria-label": "前端改動內容",
+          children: FRONTEND_INFO_TABS.map((tab) =>
+            jsx.jsx(
+              "button",
+              {
+                type: "button",
+                role: "tab",
+                id: `frontend-info-tab-${tab.id}`,
+                "aria-selected": activeTab === tab.id,
+                "aria-controls": `frontend-info-panel-${tab.id}`,
+                tabIndex: activeTab === tab.id ? 0 : -1,
+                ref: (element) => {
+                  tabRefs.current[tab.id] = element;
+                },
+                onClick: () => setActiveTab(tab.id),
+                onKeyDown: handleTabKeyDown,
+                children: tab.label,
+              },
+              tab.id,
+            ),
+          ),
+        },
+        "tabs",
+      ),
+      // 分頁列固定、只有內容區捲動；以分頁 id 作 key，切換分頁時捲動位置回到頂部
+      jsx.jsx(
+        "div",
+        {
+          className: "frontend-changelog-scroll",
+          role: "tabpanel",
+          id: `frontend-info-panel-${activeTab}`,
+          "aria-labelledby": `frontend-info-tab-${activeTab}`,
+          tabIndex: 0,
+          children:
+            activeTab === "workflow"
+              ? jsx.jsx(WorkflowGuidePanel, {})
+              : activeTab === "documents"
+                ? jsx.jsx(DocumentGuidePanel, {})
+                : jsx.jsx("div", {
+                  className: "frontend-changelog",
+                  children: FRONTEND_CHANGELOG.map((section) =>
+                    jsx.jsxs(
+                      "section",
+                      {
+                        children: [
+                          jsx.jsx("h3", { children: section.title }),
+                          jsx.jsx("ul", {
+                            children: section.items.map((item) => jsx.jsx("li", { children: item }, item)),
+                          }),
+                        ],
+                      },
+                      section.title,
+                    ),
+                  ),
+                }),
+        },
+        activeTab,
+      ),
+    ],
+  });
+}
 
 /* ---- 7.4 畫面 Screens：登入畫面 ---- */
 function LoginScreen({ onLogin: onLogin }) {
@@ -290,7 +822,7 @@ function App() {
             "本人",
           status: "待處理",
           notify: "電子通知",
-          time: "2026-08-27 10:30",
+          time: formatNow(),
           applicantDetails: isRelativeCase
             ? {
                 foreignName: formData.en,
@@ -590,29 +1122,7 @@ function App() {
         ],
       }),
       jsx.jsx("main", { className: "content", children: renderScreen() }),
-      showFrontendChanges &&
-        jsx.jsx(Modal, {
-          title: `版本 ${APP_VERSION} 前端改動`,
-          onClose: () => setShowFrontendChanges(false),
-          bodyClassName: "frontend-changelog-scroll",
-          children: jsx.jsx("div", {
-            className: "frontend-changelog",
-            children: FRONTEND_CHANGELOG.map((section) =>
-              jsx.jsxs(
-                "section",
-                {
-                  children: [
-                    jsx.jsx("h3", { children: section.title }),
-                    jsx.jsx("ul", {
-                      children: section.items.map((item) => jsx.jsx("li", { children: item }, item)),
-                    }),
-                  ],
-                },
-                section.title,
-              ),
-            ),
-          }),
-        }),
+      showFrontendChanges && jsx.jsx(FrontendInfoModal, { onClose: () => setShowFrontendChanges(false) }),
       pendingLeaveAction && jsx.jsx(Modal, {
         title: "確認離開流程",
         onClose: () => setPendingLeaveAction(null),

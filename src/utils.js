@@ -17,6 +17,30 @@ const statusColor = (status) =>
       : status.includes("待") || status === "部分成功"
         ? "amber"
         : "blue";
+/* ---- 狀態流程順序：未列入流程的狀態排在最後 ---- */
+const statusFlowRank = (status) => {
+  const rank = WorkflowStatusOrder.indexOf(status);
+  return rank === -1 ? WorkflowStatusOrder.length : rank;
+};
+/* ---- 列印文件：清單與狀態（案件詳情「列印文件」與前端改動彈窗「文件生成說明」共用）----
+ * 申請表、聲明書只有一戶通案件才有（由申請人於一戶通建立）；公函、通知書、批示於審批通過時雲簽；
+ * 作廢案件不提供任何文件。 */
+const APPLICANT_DOCUMENTS = ["申請表", "聲明書"],
+  OFFICIAL_DOCUMENTS = ["公函", "通知書", "批示"];
+// 文件是否已簽署只由案件狀態決定：已審批及其後各步（作廢除外）
+const isDocumentSignedStatus = (status) =>
+  status !== "作廢" && statusFlowRank(status) >= statusFlowRank("已審批");
+const getCaseDocuments = (application) =>
+  application.status === "作廢"
+    ? []
+    : [...(application.source === "一戶通" ? APPLICANT_DOCUMENTS : []), ...OFFICIAL_DOCUMENTS].map((name) => ({
+        name: name,
+        statusText: isDocumentSignedStatus(application.status)
+          ? "已簽署"
+          : APPLICANT_DOCUMENTS.includes(name)
+            ? "已建立"
+            : "未簽署",
+      }));
 /* ---- ICS 解析：抽取 VEVENT 事件為公眾假期資料 ---- */
 const formatNow = () => {
   const now = new Date(),

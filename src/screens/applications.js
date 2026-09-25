@@ -107,11 +107,11 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
     [viewAttachment, setViewAttachment] = React.useState(null),
     actions = getAvailableActions(application, role),
     mainActions = actions.filter((item) => item.section === "main"),
-    documentActions = actions.filter((item) => item.section === "document"),
     notificationActions = actions.filter((item) => item.section === "notification"),
-    isDocumentSigned =
-      !(application.flags || {}).documentsPrinted &&
-      ["已審批", "已通知取件", "完成"].includes(application.status),
+    simulationActions = actions.filter((item) => item.section === "simulation"),
+    // 文件清單與狀態由 utils.js 的 getCaseDocuments 決定；已簽署或已作廢的文件不可再選代任簽署
+    caseDocuments = getCaseDocuments(application),
+    canChooseActingSigners = !isDocumentSignedStatus(application.status) && application.status !== "作廢",
     applicantDetails = BuildApplicantDetails(application),
     termsDetails = BuildTermsDetails(application),
     filerDetails = BuildFilerDetails(application),
@@ -492,7 +492,7 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
                                     children: jsx.jsxs(Select, {
                                       value: termsDraft.pickupMethod,
                                       onChange: (event) => updateTermsDraft("pickupMethod", event.target.value),
-                                      children: ["親臨", "郵寄", "電子方式"].map((option) =>
+                                      children: Object.values(WorkflowPickupMethods).map((option) =>
                                         jsx.jsx("option", { value: option, children: option }, option),
                                       ),
                                     }),
@@ -714,7 +714,11 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
                           jsx.jsx("textarea", {
                             value: note,
                             onChange: (event) => setNote(event.target.value),
-                            placeholder: "請輸入處理意見，提交後會寫入紀錄",
+                            // 一戶通退回案件的意見會隨修正通知於一戶通顯示予申請人
+                            placeholder:
+                              application.status === "退回" && application.source === "一戶通"
+                                ? "請輸入補件意見，提交後會寫入紀錄並於一戶通顯示"
+                                : "請輸入處理意見，提交後會寫入紀錄",
                           }),
                           mainActions.length > 0
                             ? jsx.jsx("div", {
@@ -736,7 +740,7 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
                               })
                             : jsx.jsx("div", {
                                 className: "readonly-note",
-                                children: "此階段的可用操作位於右側文件或通知區。",
+                                children: "此階段的可用操作位於右側通知或外部事件模擬區。",
                               }),
                         ],
                       })
@@ -794,7 +798,9 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
                 className: "panel",
                 children: [
                   jsx.jsx("h2", { children: "列印文件" }),
-                  ["申請表","聲明書", "公函", "通知書", "批示"].map((item, index) =>
+                  caseDocuments.length === 0 &&
+                    jsx.jsx("div", { className: "readonly-note", children: "案件已作廢，不提供列印文件。" }),
+                  caseDocuments.map((caseDocument) =>
                     jsx.jsxs(
                       "div",
                       {
@@ -802,18 +808,8 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
                         children: [
                           jsx.jsxs("div", {
                             children: [
-                              jsx.jsx("b", { children: item }),
-                              jsx.jsx("small", {
-                                children: (application.flags || {}).documentsPrinted
-                                  ? "已列印"
-                                  : application.status === "已審批" || application.status === "已通知取件" || application.status === "完成"
-                                    ? application.source === "一戶通"
-                                      ? "已簽署"
-                                      : "已簽署，待列印"
-                                    : index === 0 || index === 1
-                                      ? "已建立"
-                                      : "未簽署",
-                              }),
+                              jsx.jsx("b", { children: caseDocument.name }),
+                              jsx.jsx("small", { children: caseDocument.statusText }),
                             ],
                           }),
                           jsx.jsx(Button, {
@@ -821,31 +817,19 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
                             icon: Na,
                             onClick: () => {
                               (setActingSigners({ deputyDivisionHead: false, deputyDepartmentHead: false }),
-                                setPreviewDoc(item));
+                                setPreviewDoc(caseDocument.name));
                             },
                             children: "預覽",
                           }),
                         ],
                       },
-                      item,
-                    ),
-                  ),
-                  documentActions.map((item) =>
-                    jsx.jsx(
-                      Button,
-                      {
-                        variant: "outline",
-                        icon: Hd,
-                        onClick: () => runAction(item),
-                        children: item.label,
-                      },
-                      item.id,
+                      caseDocument.name,
                     ),
                   ),
                 ],
               }),
               jsx.jsxs("section", {
-                className: "panel",
+                className: "panel notification-panel",
                 children: [
                   jsx.jsx("h2", { children: "通知及簽收" }),
                   notificationActions.length > 0
@@ -867,6 +851,29 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
                       }),
                 ],
               }),
+              // 演示用：代替智取易／一戶通系統回傳的外部事件，僅在有可模擬事件時顯示
+              simulationActions.length > 0 &&
+                jsx.jsxs("section", {
+                  className: "panel simulation-panel",
+                  children: [
+                    jsx.jsx("h2", { children: "外部事件模擬" }),
+                    jsx.jsx("p", {
+                      className: "readonly-note",
+                      children: "演示用按鈕，代替智取易或一戶通系統回傳的事件。",
+                    }),
+                    simulationActions.map((item) =>
+                      jsx.jsx(
+                        Button,
+                        {
+                          variant: "outline",
+                          onClick: () => runAction(item),
+                          children: item.label,
+                        },
+                        item.id,
+                      ),
+                    ),
+                  ],
+                }),
             ],
           }),
         ],
@@ -907,7 +914,7 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
             jsx.jsxs("div", {
               className: "form-actions document-preview-actions",
               children: [
-                !isDocumentSigned &&
+                canChooseActingSigners &&
                   jsx.jsxs("div", {
                     className: "document-signature-options",
                     children: [
