@@ -90,7 +90,7 @@ const padDatePart = (part) => String(part).padStart(2, "0"),
     return `${endDate.getFullYear()}-${padDatePart(endDate.getMonth() + 1)}-${padDatePart(endDate.getDate())} 00:00`;
   })();
 
-/* ---- 演示案件生成：由「待處理」起按流程重放操作，狀態、內部階段、標記及歷程必與 workflow 一致 ----
+/* ---- 演示案件生成：一戶通由「待處理」、親臨由「待複核」起按流程重放操作，狀態、標記及歷程必與 workflow 一致 ----
  * hoursAgo：相對系統時間的建立時數；steps：依序執行的操作 id，或 [操作 id, 意見]。
  * 各步操作於建立後每 20 小時執行一次，最後一步不晚於一小時前。 */
 const formatDemoTime = (date) =>
@@ -108,13 +108,17 @@ const formatDemoTime = (date) =>
           note: note,
         }).application;
       },
-      makeDemoApplication({ ...application, status: "待處理", time: formatDemoTime(new Date(createdAt)) }),
+      makeDemoApplication({
+        ...application,
+        status: application.source === "親臨" ? "待複核" : "待處理",
+        time: formatDemoTime(new Date(createdAt)),
+      }),
     );
   };
 
 // 共用流程片段
 const OnlineToApproval = ["submit_initial_review", "complete_review", "approve_sign"],
-  CounterToApproval = ["counter_submit_review", "counter_complete_review", "counter_approve_sign"],
+  CounterToApproval = ["counter_complete_review", "counter_approve_sign"],
   // 一戶通審批通過後自動轉入取件分支（智取易／親臨 → 等待制件；電子通知 → 已發送電子通知），各取件方式的後續操作
   OnlinePickupSteps = {
     智取易: [
@@ -257,7 +261,7 @@ const DemoData = {
       notify: "短信",
       hoursAgo: 1.5,
     }),
-    // 待審批（處理人員複核）
+    // 待審批（主管審批）
     buildDemoCase({
       id: "107/DICJ/2026",
       name: "周永康",
@@ -278,9 +282,9 @@ const DemoData = {
         address: "澳門筷子基北灣大馬路12號",
       },
       hoursAgo: 20,
-      steps: ["counter_submit_review"],
+      steps: ["counter_complete_review"],
     }),
-    // 待審批（主管審批）
+    // 退回（處理人員複核退回）
     buildDemoCase({
       id: "106/DICJ/2026",
       name: "李嘉欣",
@@ -289,7 +293,7 @@ const DemoData = {
       party: "本人",
       notify: "短信",
       hoursAgo: 45,
-      steps: ["counter_submit_review", "counter_complete_review"],
+      steps: [["counter_return_case", "申請資料需要補正，請櫃枱跟進"]],
     }),
     buildDemoCase({
       id: "105/DICJ/2026",
@@ -300,7 +304,6 @@ const DemoData = {
       notify: "短信",
       hoursAgo: 75,
       steps: [
-        "counter_submit_review",
         "counter_complete_review",
         ["counter_request_return", "禁入範圍與申請人聲明不一致，請補正申請表"],
       ],
@@ -357,7 +360,7 @@ const DemoData = {
       party: "本人",
       notify: "短信",
       hoursAgo: 230,
-      steps: ["counter_submit_review", ["void_case", "申請人撤回申請"]],
+      steps: [["void_case", "申請人撤回申請"]],
     }),
   ],
   sanctions: [

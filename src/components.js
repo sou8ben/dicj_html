@@ -227,8 +227,8 @@ function ProcessTimeline({ application: application }) {
     pickupSteps = isOnline ? ONLINE_PICKUP_STEPS[getPickupMethod(application)] : [],
     stepLabels = isOnline
       ? ["待處理", "補件處理", "待複核", "待審批", "已審批", ...pickupSteps, "完成"]
-      : ["待處理", "待審批", "已審批", "完成"],
-    // 退回的預設位置：一戶通修正後回到待複核，親臨兩種退回均來自待審批
+      : ["暫存", "待複核", "待審批", "已審批", "完成"],
+    // 無歷程的退回預設位置：一戶通及親臨均為待複核
     stepIndexByStatus = isOnline
       ? {
           待處理: 0,
@@ -240,7 +240,7 @@ function ProcessTimeline({ application: application }) {
           ...Object.fromEntries(pickupSteps.map((status, index) => [status, 5 + index])),
           完成: stepLabels.length - 1,
         }
-      : { 待處理: 0, 待審批: 1, 退回: 1, 已審批: 2, 完成: 3 },
+      : { 暫存: 0, 待複核: 1, 退回: 1, 待審批: 2, 已審批: 3, 完成: 4 },
     isCancelled = application.status === "作廢",
     isReturned = application.status === "退回",
     // 作廢及退回案件停在轉入前所在的步驟，以歷程中最後一筆轉入目前狀態的原狀態判定
@@ -435,8 +435,7 @@ function ApplicationsTable({ rows: rows, onOpen: onOpen, actionLabel: actionLabe
           type: (row) => row.type,
           source: (row) => row.source,
           party: (row) => row.party,
-          // 依流程順序排序；親臨待審批的主管審批階段排在處理人員複核之後
-          status: (row) => statusFlowRank(row.status) + (row.stage === "supervisor_approval" ? 0.5 : 0),
+          status: (row) => statusFlowRank(row.status),
           pickupMethod: (row) => (row.termsDetails && row.termsDetails.pickupMethod) || "親臨",
           time: (row) => row.time,
         }),

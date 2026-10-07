@@ -13,7 +13,8 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 - Leaving an unfinished application or termination flow requires confirmation only when the flow data has changed (`flowDirty` is set by intake/form edits via the screens' `onDirty` callback and cleared on flow entry, successful submission, logout, role changes, and demo reset); cancelling preserves the current form. Guard navigation, logout, demo reset, role changes that leave the flow, and browser unload. Internal steps, successful submission, and leaving an untouched flow do not prompt.
 
 - Keep the One Account initial-document supplement loop separate from later review returns: confirming missing documents (`confirm_missing`) sends the supplement notice automatically and moves the case straight to `已通知補件` (no separate visible `待通知補件` status or manual `send_supplement_notice` step), then, when the applicant supplements on 一戶通, the system auto-confirms receipt and moves `已通知補件 → 待處理` with no counter action (demo: the `simulate_applicant_supplement` simulation button, recorded in history as 申請人「於一戶通補交資料」 plus 系統「自動確認收到補交資料」; simulation actions may set `historyActor`/`historyLabel` to record the real external actor); processor/supervisor returns use `退回 → 待複核` after corrected documents are confirmed.
-- Keep the counter workflow's visible status as `待審批`; use an internal stage to distinguish processor review from supervisor approval instead of adding a visible `待複核` status.
+- 親臨流程以可見狀態直接區分角色：`待複核` 由處理人員複核，完成後轉為 `待審批` 由主管審批；不得再以 `stage` 將處理人員複核藏在 `待審批` 內。退回補正後回到 `待複核` 重新複核。
+- 親臨（臨櫃）主線為 `暫存 → 待複核 → 待審批 → 已審批 → 完成`；`暫存` 由櫃枱人員執行「提交申請」後轉為 `待複核`。流程說明中的此列由 workflow 的 `submit_counter_application` 操作推導，不手寫下一狀態。
 - RecordCheck 核查禁入紀錄時以「證件類型:證件號碼」為鍵查詢 `DemoData.exclusionHistory`（demo 紀錄均為澳門居民身份證），兩者須同時相符；介面顯示「證件類型：…　證件號碼：…」。續期判定（到期前 30 天內）以本機時間為準，demo 13888888 的到期日為本機日期 + 20 天。
 - 公眾假期資料以「名稱+日期」去重、依日期排序；跨日假期日期存為「開始日 至 結束日」，編輯時僅改開始日（改到 ≥ 結束日則收斂為單日），儲存需有日期且不可與其他列重複。
 - System administrators can operate the full workflow, including counter intake: every status-available action (transition, print, notify, hand over, void) is open to them regardless of the action's designated role.
@@ -25,16 +26,15 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 - 一戶通案件審批通過後不停留在「已審批」：主管「審批通過並雲簽」時，`transition` 經 `getAutoAdvance` 依 `termsDetails.pickupMethod`（`getPickupMethod`，舊資料「電子方式」視為電子通知、其餘視為親臨）自動轉入下一步，歷程另記一筆 `actorRole: "系統"`（「自動送交制件」或「自動發送電子通知」），保留「待審批 → 已審批 → …」節點。一戶通沒有「完成案件處理」「送交制件」「發送電子通知」手動操作。分支：智取易 已審批 → 等待制件 → 已制件 → 已送出 → 送達待取件 → 已通知取件 → 已取件 → 完成；親臨 已審批 → 等待制件 → 已制件 → 已通知取件 → 已取件 → 完成；電子通知 已審批 → 已發送電子通知 → 待查閱 → 已查閱 → 完成。終止狀態沿用「完成」，不另設「已完成」。取件各步均由櫃枱人員操作。親臨（臨櫃）案件的已審批為：處理人員「完成案件處理」→ 櫃枱「記錄領取及簽收」→ 完成。
 - 智取易送達、申請人於智取易取件、電子通知送達、申請人查閱屬外部系統事件，以 `section: "simulation"` 的「模擬…」操作呈現，案件詳情放在右側虛線外框的「外部事件模擬」面板，與正式操作區分。取件方式選項為智取易、親臨、電子通知（`PICKUP_METHODS`），不再提供郵寄。
 - 一戶通案件不提供作廢（業務設計，非遺漏）；「作廢案件」只適用於親臨案件。
-- 親臨案件「待審批」若未記錄 `stage`，視為 `processor_review`（處理人員複核）。
 - 系統不設列印步驟或「已列印」狀態（已移除 `counter_print_documents` 與 `documentsPrinted`）。文件是否已簽署只以案件狀態判定（已審批及其後各步，作廢除外），文件列顯示「已建立／未簽署／已簽署」；已簽署或作廢案件的文件預覽不顯示「代任簽署」選項；預覽視窗的「打印」「下載」只輸出文件，不改變案件狀態。
 - 案件詳情「列印文件」清單：一戶通案件為申請表、聲明書、公函、通知書、批示；親臨案件只有公函、通知書、批示（無申請表、聲明書）；作廢案件不列任何文件，只顯示「案件已作廢，不提供列印文件。」。審批前申請表／聲明書顯示「已建立」、其餘「未簽署」，審批後一律「已簽署」。 清單與狀態只在 `utils.js` 的 `getCaseDocuments` 定義，案件詳情與文件生成說明共用。
-- 作廢及退回案件的「案件流程」停在轉入前所在步驟（取歷程中最後一筆 `toStatus` 為目前狀態的 `fromStatus`）；無歷程時一戶通退回預設標在「待複核」、親臨退回標在「待審批」。退回以琥珀色（`.process-progress.returned`）標示，作廢維持紅色。「補件處理」一格只表示首次補件循環。
+- 作廢及退回案件的「案件流程」停在轉入前所在步驟（取歷程中最後一筆 `toStatus` 為目前狀態的 `fromStatus`）；無歷程時一戶通及親臨退回均預設標在「待複核」。退回以琥珀色（`.process-progress.returned`）標示，作廢維持紅色。「補件處理」一格只表示首次補件循環。
 - 「已審批」的負責角色（只適用親臨案件，一戶通不停留在已審批）：未完成案件處理為處理人員，完成後為櫃枱人員。一戶通審批後的取件各步由櫃枱人員負責。
 - 工作台超時統計以系統日期計算；臨櫃新建案件的申請時間為實際建立時間（`formatNow()`）。
-- 申請管理示範案件以 `buildDemoCase`（`demo-data.js`）生成：每筆只定義 `hoursAgo` 與從「待處理」起的 `steps`，由 workflow `transition` 重放產生狀態、stage、flags 與歷程，不要手寫 status/history。列表順序為一戶通在前、親臨在後，各自按流程順序每個狀態／子狀態一筆，方便逐步演示；一戶通審批後以 `buildPickupBranch` 為智取易、親臨、電子通知各建一條分支（第 0 筆為審批通過後自動轉入的狀態，第 n 筆停在分支第 n 步）；時間相對系統時間。
-- 前端改動彈窗（`FrontendInfoModal`）分為「更新內容」「流程說明」「文件生成說明」三個分頁。文件生成說明（`DocumentGuidePanel`）的各狀態文件表由 `collectReachableStatuses`（從待處理走遍各來源可到達狀態，一戶通逐一取件方式）加 `getCaseDocuments` 推導，連續相同者合併一列；文件由來與預覽／打印／下載規則為說明文字，改動文件規則時需同步更新。流程說明與更新內容兩個分頁，分頁列固定、只有內容區捲動。流程說明依 `WORKFLOW_GUIDE` 分段（一戶通收件至審批、智取易、親臨、電子通知三條取件分支、親臨臨櫃流程），狀態轉換表由各段 `scenarios` 經 `getAvailableActions`／`transition` 即時推導，模擬操作標示「演示模擬」；不要手寫操作或下一狀態，流程改動時只需更新主線、要點文字，或在新增子狀態時補 scenario。
+- 申請管理示範案件以 `buildDemoCase`（`demo-data.js`）生成：每筆只定義 `hoursAgo` 與 `steps`，由 workflow `transition` 重放產生狀態、flags 與歷程，不要手寫 status/history；一戶通從 `待處理` 起，親臨從 `待複核` 起。列表順序為一戶通在前、親臨在後，各自按流程順序每個狀態／子狀態一筆，方便逐步演示；一戶通審批後以 `buildPickupBranch` 為智取易、親臨、電子通知各建一條分支（第 0 筆為審批通過後自動轉入的狀態，第 n 筆停在分支第 n 步）；時間相對系統時間。
+- 前端改動彈窗（`FrontendInfoModal`）分為「更新內容」「流程說明」「文件生成說明」三個分頁。文件生成說明（`DocumentGuidePanel`）的各狀態文件表由 `collectReachableStatuses`（一戶通從 `待處理`、親臨從 `待複核` 走遍各來源可到達狀態，一戶通逐一取件方式）加 `getCaseDocuments` 推導，連續相同者合併一列；文件由來與預覽／打印／下載規則為說明文字，改動文件規則時需同步更新。流程說明與更新內容兩個分頁，分頁列固定、只有內容區捲動。流程說明依 `WORKFLOW_GUIDE` 分段（一戶通收件至審批、智取易、親臨、電子通知三條取件分支、親臨臨櫃流程），狀態轉換表由各段 `scenarios` 經 `getAvailableActions`／`transition` 即時推導，模擬操作標示「演示模擬」；不要手寫操作或下一狀態，流程改動時只需更新主線、要點文字，或在新增子狀態時補 scenario。
 - 狀態流程順序只定義一份：`workflow.js` 的 `STATUS_ORDER`（待處理、已通知補件、待複核、待審批、退回、已審批、已通知取件、完成、作廢），列表「狀態」欄排序（`statusFlowRank`）與狀態篩選選項都由它產生。
-- 案件詳情的「申請概況」不顯示「目前階段」欄位；內部 `stage` 仍保留供工作流程判定使用。
+- 案件詳情的「申請概況」不顯示「目前階段」欄位；親臨流程不使用內部 `stage` 判定處理人員複核或主管審批。
 - 案件詳情的「申請人資料」與「期限、通知與聲明」共用同一個 panel，後者以帶分隔線的 subsection 呈現。
 - Applications 案件詳情在上述共用 panel 內，編輯與唯讀狀態均以完整標籤「申請禁入之博彩承批公司」顯示禁入範圍，不使用縮寫「禁入之承批公司」，亦不另建重複欄位。
 - 案件詳情的「申請人資料」與「期限、通知與聲明」標題右側不顯示「編輯」按鈕；底層的可編輯狀態、儲存/取消邏輯與編輯表單 UI 予以保留（僅隱藏觸發按鈕），供日後需要時重新開放入口。

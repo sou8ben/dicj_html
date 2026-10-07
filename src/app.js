@@ -28,8 +28,16 @@ const NAV_ITEMS = [
   { label: "帳號管理", id: "accounts", icon: Nd },
   { label: "操作日誌", id: "logs", icon: W8 },
 ];
-const APP_VERSION = "2026.09.25 05:03PM";
+const APP_VERSION = "2026.10.07 03:38PM";
 const FRONTEND_CHANGELOG = [
+  {
+    title: "2026.10.07 更新內容",
+    items: [
+      "修正親臨案件的審批狀態：處理人員複核顯示為「待複核」，完成複核後才轉為「待審批」交主管審批；移除以內部階段在「待審批」區分兩個角色的舊邏輯。",
+      "親臨案件退回補正後回到「待複核」，由處理人員重新複核。",
+      "親臨流程主線補上「暫存」；櫃枱人員提交申請後，案件由「暫存」轉為「待複核」。",
+    ],
+  },
   {
     title: "2026.09.25 更新內容",
     items: [
@@ -43,7 +51,6 @@ const FRONTEND_CHANGELOG = [
       "一戶通案件的案件流程依取件方式顯示對應的取件步驟；步驟較多時標籤改為上下交錯排列，避免相鄰長標籤重疊。",
       "作廢案件的案件流程改為停在作廢前所在的步驟，不再把後續步驟標示為已完成。",
       "一戶通退回案件的案件流程改為停在退回發生的步驟（待複核或待審批），並以琥珀色標示「退回」，與作廢的紅色區分。",
-      "親臨案件於「待審批」而未記錄內部階段時，視為處理人員複核，避免案件無人可操作。",
       "親臨案件「已審批」階段的負責角色依案件處理進度更新（流程模組邏輯，畫面暫不顯示）。",
       "文件是否已簽署改以案件狀態判定（已審批及其後各步）；已簽署或已作廢案件的文件預覽不再顯示「代任簽署」選項。",
       "申請管理示範案件改為按流程生成：一戶通（收件至審批，以及智取易、親臨、電子通知三條取件分支）在前、親臨在後，每個狀態／子狀態一筆，歷程由實際流程操作重放產生，申請時間相對系統時間計算。",
@@ -144,7 +151,7 @@ items: [
 /* ----------------------------------------------------------------
  * 流程說明 Workflow Guide（前端改動彈窗「流程說明」分頁）
  * 主線與要點為說明文字；狀態轉換表由 workflow.js 即時推導，流程規則改動時自動同步。
- * scenarios 列出每個可操作的狀態／子狀態，flags、stage、pickupMethod 用於重現該子狀態。
+ * scenarios 列出每個可操作的狀態／子狀態，flags、pickupMethod 用於重現該子狀態。
  * ---------------------------------------------------------------- */
 const WORKFLOW_GUIDE = [
   {
@@ -209,16 +216,17 @@ const WORKFLOW_GUIDE = [
   {
     source: "親臨",
     title: "親臨（臨櫃）流程",
-    mainLine: ["待處理", "待審批", "已審批", "完成"],
+    mainLine: ["暫存", "待複核", "待審批", "已審批", "完成"],
     notes: [
-      "「待審批」內部分為處理人員複核及主管審批兩個階段，列表只顯示「待審批」。",
-      "退回後由櫃枱確認補正並重新送複核，不需先發修正通知。",
+      "櫃枱人員提交暫存申請後，案件轉為「待複核」。",
+      "「待複核」由處理人員複核；複核完成後轉為「待審批」，由主管審批。",
+      "退回後由櫃枱確認補正並回到「待複核」重新複核，不需先發修正通知。",
       "已審批由處理人員完成案件處理後，櫃枱即可記錄領取及簽收（不設列印步驟，文件可於預覽視窗打印）。",
     ],
     scenarios: [
-      { status: "待處理" },
-      { status: "待審批", note: "處理人員複核", stage: "processor_review" },
-      { status: "待審批", note: "主管審批", stage: "supervisor_approval" },
+      { status: "暫存" },
+      { status: "待複核" },
+      { status: "待審批" },
       { status: "退回" },
       { status: "已審批", note: "未完成案件處理" },
       { status: "已審批", note: "已完成案件處理", flags: { processingCompleted: true } },
@@ -416,7 +424,7 @@ const DOCUMENT_GUIDE_OUTPUT_RULES = [
   "打印：開啟瀏覽器列印對話框；下載：存為「{文件名}_{案件編號}.html」。文件內容包括文件名稱、案件編號、申請人、申請類型、來源及申請時間。",
   "打印及下載只輸出文件，不改變案件狀態、不寫入操作紀錄；流程不設列印步驟，亦沒有「已列印」狀態。",
 ];
-// 從待處理起以系統管理員身分走遍所有可用操作，收集該來源可到達的狀態（含自動轉移經過的已審批）
+// 一戶通從待處理、親臨從待複核起，以系統管理員身分走遍所有可用操作，收集可到達狀態（含自動轉移經過的已審批）
 function collectReachableStatuses(source) {
   const pickupMethods = source === "一戶通" ? Object.values(WorkflowPickupMethods) : [undefined],
     statuses = new Set(),
@@ -431,7 +439,7 @@ function collectReachableStatuses(source) {
       queue = [
         {
           source: source,
-          status: "待處理",
+          status: source === "親臨" ? "待複核" : "待處理",
           stage: null,
           flags: {},
           termsDetails: pickupMethod ? { pickupMethod: pickupMethod } : {},
@@ -808,7 +816,7 @@ function App() {
       var partyText;
       const caseId = `${111 + applications.length}/DICJ/2026`,
         isRelativeCase = formData.party === "親屬申請",
-        newApplication = makeDemoApplication({
+        draftApplication = makeDemoApplication({
           id: caseId,
           name: formData.name,
           type:
@@ -821,7 +829,7 @@ function App() {
           party:
             ((partyText = formData.party) == null ? undefined : partyText.replace("申請", "")) ||
             "本人",
-          status: "待處理",
+          status: "暫存",
           notify: "電子通知",
           time: formatNow(),
           applicantDetails: isRelativeCase
@@ -870,7 +878,12 @@ function App() {
             counsel: formData.counsel,
             referralChannels: (formData.referralChannels || []).join("、"),
           },
-        });
+        }),
+        newApplication = transitionApplication(
+          draftApplication,
+          "submit_counter_application",
+          role,
+        ).application;
       (formData.applicant &&
         formData.applicant.docType &&
         formData.doc &&

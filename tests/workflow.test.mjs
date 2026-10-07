@@ -158,8 +158,8 @@ test("取件方式決定分流，舊資料的電子方式視為電子通知、�
   assert.equal(workflow.getResponsibleRole(producedLocker), ROLES.COUNTER);
 });
 
-test("臨櫃待審批未記錄內部階段時視為處理人員複核", () => {
-  const current = application({ source: "親臨", status: "待審批", stage: null });
+test("臨櫃待複核由處理人員複核，完成後轉為待審批", () => {
+  const current = application({ source: "親臨", status: "待複核", stage: null });
   assert.deepEqual(
     getAvailableActions(current, ROLES.PROCESSOR).map((action) => action.id),
     ["counter_return_case", "counter_complete_review", "void_case"],
@@ -170,7 +170,25 @@ test("臨櫃待審批未記錄內部階段時視為處理人員複核", () => {
   );
   assert.equal(workflow.getResponsibleRole(current), ROLES.PROCESSOR);
   const next = run(current, "counter_complete_review", ROLES.PROCESSOR);
-  assert.equal(next.stage, "supervisor_approval");
+  assert.equal(next.status, "待審批");
+  assert.equal(next.stage, null);
+  assert.equal(workflow.getResponsibleRole(next), ROLES.SUPERVISOR);
+});
+
+test("臨櫃暫存由櫃枱提交後轉為待複核", () => {
+  const draft = application({ source: "親臨", status: "暫存" });
+  assert.equal(workflow.getResponsibleRole(draft), ROLES.COUNTER);
+  assert.deepEqual(
+    getAvailableActions(draft, ROLES.COUNTER).map((action) => action.id),
+    ["submit_counter_application"],
+  );
+  const submitted = run(draft, "submit_counter_application", ROLES.COUNTER);
+  assert.equal(submitted.status, "待複核");
+  assert.equal(workflow.getResponsibleRole(submitted), ROLES.PROCESSOR);
+  assert.deepEqual(
+    submitted.history.map((entry) => [entry.actorRole, entry.action, entry.fromStatus, entry.toStatus]),
+    [[ROLES.COUNTER, "提交申請", "暫存", "待複核"]],
+  );
 });
 
 test("親臨已審批的負責角色隨案件處理進度更新", () => {
@@ -180,14 +198,14 @@ test("親臨已審批的負責角色隨案件處理進度更新", () => {
   assert.equal(getResponsibleRole(counter({ processingCompleted: true })), ROLES.COUNTER);
 });
 
-test("臨櫃待審批以內部階段轉移負責角色", () => {
-  let current = application({ source: "親臨" });
-  current = run(current, "counter_submit_review", ROLES.COUNTER);
-  assert.equal(current.status, "待審批");
-  assert.equal(current.stage, "processor_review");
+test("臨櫃待複核完成後轉交主管審批", () => {
+  let current = application({ source: "親臨", status: "待複核" });
+  assert.equal(current.status, "待複核");
+  assert.equal(workflow.getResponsibleRole(current), ROLES.PROCESSOR);
   current = run(current, "counter_complete_review", ROLES.PROCESSOR);
   assert.equal(current.status, "待審批");
-  assert.equal(current.stage, "supervisor_approval");
+  assert.equal(current.stage, null);
+  assert.equal(workflow.getResponsibleRole(current), ROLES.SUPERVISOR);
   current = run(current, "counter_approve_sign", ROLES.SUPERVISOR);
   assert.equal(current.status, "已審批");
   current = run(current, "complete_processing", ROLES.PROCESSOR);
@@ -210,7 +228,7 @@ test("臨櫃案件已審批時須完成案件處理才能記錄領取，不設�
 });
 
 test("臨櫃案件複核或審批階段可退回，補正後重新送複核", () => {
-  let current = application({ source: "親臨", status: "待審批", stage: "processor_review" });
+  let current = application({ source: "親臨", status: "待複核" });
   current = run(current, "counter_return_case", ROLES.PROCESSOR);
   assert.equal(current.status, "退回");
   assert.deepEqual(
@@ -218,11 +236,11 @@ test("臨櫃案件複核或審批階段可退回，補正後重新送複核", ()
     ["counter_resubmit_review", "void_case"].sort(),
   );
   current = run(current, "counter_resubmit_review", ROLES.COUNTER);
-  assert.equal(current.status, "待審批");
-  assert.equal(current.stage, "processor_review");
+  assert.equal(current.status, "待複核");
+  assert.equal(current.stage, null);
 
   current = run(
-    application({ source: "親臨", status: "待審批", stage: "supervisor_approval" }),
+    application({ source: "親臨", status: "待審批" }),
     "counter_request_return",
     ROLES.SUPERVISOR,
   );
@@ -231,12 +249,24 @@ test("臨櫃案件複核或審批階段可退回，補正後重新送複核", ()
 
 test("處理人員與主管可作廢未完成的臨櫃案件", () => {
   for (const role of [ROLES.PROCESSOR, ROLES.SUPERVISOR]) {
-    for (const status of ["待處理", "待審批", "已審批"]) {
-      const stage = status === "待審批" ? "processor_review" : null;
-      const current = run(application({ source: "親臨", status, stage }), "void_case", role);
+    for (const status of ["待複核", "待審批", "已審批"]) {
+      const current = run(application({ source: "親臨", status }), "void_case", role);
       assert.equal(current.status, "作廢");
     }
   }
+});
+
+test("臨櫃流程不再使用待審批內部階段或櫃枱送複核操作", () => {
+  assert.equal("counter_submit_review" in workflow.ACTIONS, false);
+  const pendingApproval = application({ source: "親臨", status: "待審批", stage: "processor_review" });
+  assert.deepEqual(
+    getAvailableActions(pendingApproval, ROLES.SUPERVISOR).map((action) => action.id),
+    ["counter_request_return", "counter_approve_sign", "void_case"],
+  );
+  assert.deepEqual(
+    getAvailableActions(pendingApproval, ROLES.PROCESSOR).map((action) => action.id),
+    ["void_case"],
+  );
 });
 
 test("角色與終止狀態限制會阻止越權操作", () => {
@@ -262,7 +292,7 @@ test("系統管理員可操作全流程，不限角色，唯終止狀態除外",
   assert.equal(current.status, "完成");
   assert.equal(getAvailableActions(current, ROLES.ADMIN).length, 0);
 
-  const counter = run(application({ source: "親臨", status: "待處理" }), "void_case", ROLES.ADMIN);
+  const counter = run(application({ source: "親臨", status: "待複核" }), "void_case", ROLES.ADMIN);
   assert.equal(counter.status, "作廢");
   assert.equal(getAvailableActions(counter, ROLES.ADMIN).length, 0);
 });

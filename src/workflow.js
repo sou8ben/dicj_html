@@ -45,9 +45,15 @@
   ];
 
   const TERMINAL_STATUSES = new Set(["完成", "作廢"]);
-  const COUNTER_VOIDABLE_STATUSES = new Set(["待處理", "待審批", "已審批", "退回"]);
+  const COUNTER_VOIDABLE_STATUSES = new Set(["待複核", "待審批", "已審批", "退回"]);
 
   const ACTIONS = {
+    submit_counter_application: {
+      label: "提交申請",
+      role: ROLES.COUNTER,
+      section: "main",
+      message: "申請已提交，案件已送交處理人員複核",
+    },
     confirm_missing: {
       label: "確認缺件並發送通知",
       role: ROLES.COUNTER,
@@ -169,12 +175,6 @@
       section: "main",
       message: "案件已結案",
     },
-    counter_submit_review: {
-      label: "完成列印、簽署並送複核",
-      role: ROLES.COUNTER,
-      section: "main",
-      message: "臨櫃申請表已簽署，案件送交處理人員複核",
-    },
     counter_return_case: {
       label: "退回案件",
       role: ROLES.PROCESSOR,
@@ -290,14 +290,12 @@
   function availableCounterActionIds(application) {
     const flags = cloneFlags(application);
     const actionIds = [];
-    // 未記錄內部階段的待審批案件視為處理人員複核，避免案件無人可操作
-    const isSupervisorStage = application.stage === "supervisor_approval";
 
-    if (application.status === "待處理") actionIds.push("counter_submit_review");
-    if (application.status === "待審批" && !isSupervisorStage) {
+    if (application.status === "暫存") actionIds.push("submit_counter_application");
+    if (application.status === "待複核") {
       actionIds.push("counter_return_case", "counter_complete_review");
     }
-    if (application.status === "待審批" && isSupervisorStage) {
+    if (application.status === "待審批") {
       actionIds.push("counter_request_return", "counter_approve_sign");
     }
     if (application.status === "退回") actionIds.push("counter_resubmit_review");
@@ -335,12 +333,11 @@
       // 其餘狀態（收件、補件、退回及取件各步）均由櫃枱人員跟進
       return ROLES.COUNTER;
     }
-    if (application.status === "待處理") return ROLES.COUNTER;
+    if (application.status === "暫存") return ROLES.COUNTER;
+    if (application.status === "待複核") return ROLES.PROCESSOR;
     if (application.status === "退回") return ROLES.COUNTER;
     if (application.status === "已審批") return getApprovedResponsibleRole(application);
-    if (application.status === "待審批") {
-      return application.stage === "supervisor_approval" ? ROLES.SUPERVISOR : ROLES.PROCESSOR;
-    }
+    if (application.status === "待審批") return ROLES.SUPERVISOR;
     return "—";
   }
 
@@ -352,6 +349,10 @@
     };
 
     switch (actionId) {
+      case "submit_counter_application":
+        next.status = "待複核";
+        next.stage = null;
+        break;
       case "confirm_missing":
         next.status = "已通知補件";
         break;
@@ -411,10 +412,9 @@
         next.status = "完成";
         next.stage = null;
         break;
-      case "counter_submit_review":
       case "counter_resubmit_review":
-        next.status = "待審批";
-        next.stage = "processor_review";
+        next.status = "待複核";
+        next.stage = null;
         break;
       case "counter_return_case":
       case "counter_request_return":
@@ -423,7 +423,7 @@
         break;
       case "counter_complete_review":
         next.status = "待審批";
-        next.stage = "supervisor_approval";
+        next.stage = null;
         break;
       case "void_case":
         next.status = "作廢";
