@@ -1249,14 +1249,7 @@ function ApplicationFormScreen({ mode: mode, onSubmit: onSubmit, onCancel: onCan
                       scope === "指定承批公司" &&
                         jsx.jsx("div", {
                           className: "check-grid",
-                          children: [
-                            "澳娛綜合度假股份有限公司",
-                            "永利渡假村（澳門）股份有限公司",
-                            "美高梅金殿超濠股份有限公司",
-                            "新濠博亞（澳門）股份有限公司",
-                            "銀河娛樂場股份有限公司",
-                            "威尼斯人澳門股份有限公司",
-                          ].map((option) =>
+                          children: EXCLUSION_COMPANIES.map((option) =>
                             jsx.jsxs(
                               "label",
                               {

@@ -68,6 +68,13 @@ function BuildTermsDetails(application) {
     ...(application.termsDetails || {}),
   };
 }
+function BuildScopeEditorDetails(scope) {
+  const normalizedScope = String(scope || "").trim();
+  return {
+    mode: normalizedScope === "全部" || !normalizedScope ? "全部" : "指定承批公司",
+    companies: normalizedScope === "全部" ? [] : normalizedScope.split("、").map((item) => item.trim()).filter(Boolean),
+  };
+}
 function BuildFilerDetails(application) {
   return {
     name: "",
@@ -96,6 +103,8 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
     [applicantDraft, setApplicantDraft] = React.useState(() => BuildApplicantDetails(application)),
     [isEditingTerms, setIsEditingTerms] = React.useState(false),
     [termsDraft, setTermsDraft] = React.useState(() => BuildTermsDetails(application)),
+    [termsScopeMode, setTermsScopeMode] = React.useState(() => BuildScopeEditorDetails(BuildTermsDetails(application).scope).mode),
+    [termsScopeCompanies, setTermsScopeCompanies] = React.useState(() => BuildScopeEditorDetails(BuildTermsDetails(application).scope).companies),
     [confirmAction, setConfirmAction] = React.useState(null),
     [previewDoc, setPreviewDoc] = React.useState(null),
     [actingSigners, setActingSigners] = React.useState({ deputyDivisionHead: false, deputyDepartmentHead: false }),
@@ -117,8 +126,10 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
     filerDetails = BuildFilerDetails(application),
     canEditApplicant =
       (role === WorkflowRoles.COUNTER || role === WorkflowRoles.ADMIN) &&
-      ["待處理", "已通知補件", "退回"].includes(application.status),
+      (["待處理", "已通知補件", "退回"].includes(application.status) ||
+        (application.source === "一戶通" && ["待複核", "待審批"].includes(application.status))),
     canEditTerms = canEditApplicant,
+    canShowDetailEditors = application.source === "一戶通" && canEditApplicant,
     updateApplicantDraft = (field, value) =>
       setApplicantDraft({ ...applicantDraft, [field]: value }),
     cancelApplicantEdit = () => {
@@ -146,7 +157,12 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
     },
     updateTermsDraft = (field, value) => setTermsDraft({ ...termsDraft, [field]: value }),
     cancelTermsEdit = () => {
-      (setTermsDraft(BuildTermsDetails(application)), setIsEditingTerms(false));
+      const details = BuildTermsDetails(application),
+        scopeDetails = BuildScopeEditorDetails(details.scope);
+      (setTermsDraft(details),
+        setTermsScopeMode(scopeDetails.mode),
+        setTermsScopeCompanies(scopeDetails.companies),
+        setIsEditingTerms(false));
     },
     saveTermsDetails = () => {
       if (!termsDraft.effectiveDate || !termsDraft.endDate) {
@@ -157,9 +173,13 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
         (setToast("廢止日不可早於生效日"), setTimeout(() => setToast(""), 2600));
         return;
       }
+      if (!termsScopeMode || (termsScopeMode === "指定承批公司" && termsScopeCompanies.length === 0)) {
+        (setToast("請選擇博彩承批公司範圍；選擇「禁入除外的承批公司」時，須至少勾選一間"), setTimeout(() => setToast(""), 2600));
+        return;
+      }
       const savedDetails = {
         ...termsDraft,
-        scope: termsDraft.scope.trim(),
+        scope: termsScopeMode === "全部" ? "全部" : termsScopeCompanies.join("、"),
       };
       (onUpdateTerms(savedDetails),
         setTermsDraft(savedDetails),
@@ -291,6 +311,16 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
                     className: "section-title",
                     children: [
                       jsx.jsx("h2", { children: application.party === "親屬" ? "被申請人資料" : "申請人資料" }),
+                      canShowDetailEditors &&
+                        !isEditingApplicant &&
+                        jsx.jsx(Button, {
+                          variant: "outline",
+                          icon: T0,
+                          onClick: () => {
+                            (setApplicantDraft(BuildApplicantDetails(application)), setIsEditingApplicant(true));
+                          },
+                          children: "編輯",
+                        }),
                     ],
                   }),
                   isEditingApplicant
@@ -453,6 +483,21 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
                         className: "section-title",
                         children: [
                           jsx.jsx("h2", { children: "期限、通知與聲明" }),
+                          canShowDetailEditors &&
+                            !isEditingTerms &&
+                            jsx.jsx(Button, {
+                              variant: "outline",
+                              icon: T0,
+                              onClick: () => {
+                                const details = BuildTermsDetails(application),
+                                  scopeDetails = BuildScopeEditorDetails(details.scope);
+                                (setTermsDraft(details),
+                                  setTermsScopeMode(scopeDetails.mode),
+                                  setTermsScopeCompanies(scopeDetails.companies),
+                                  setIsEditingTerms(true));
+                              },
+                              children: "編輯",
+                            }),
                         ],
                       }),
                       isEditingTerms
@@ -481,13 +526,6 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
                                     }),
                                   }),
                                   jsx.jsx(Field, {
-                                    label: "申請禁入之博彩承批公司",
-                                    children: jsx.jsx("input", {
-                                      value: termsDraft.scope,
-                                      onChange: (event) => updateTermsDraft("scope", event.target.value),
-                                    }),
-                                  }),
-                                  jsx.jsx(Field, {
                                     label: "取件方式",
                                     children: jsx.jsxs(Select, {
                                       value: termsDraft.pickupMethod,
@@ -508,6 +546,70 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
                                       ),
                                     }),
                                   }),
+                                ],
+                              }),
+                              jsx.jsxs("div", {
+                                className: "form-section terms-scope-edit",
+                                children: [
+                                  jsx.jsx("h3", { children: "申請禁入之博彩承批公司" }),
+                                  jsx.jsxs("div", {
+                                    className: "radio-row",
+                                    children: [
+                                      jsx.jsxs("b", {
+                                        children: [
+                                          "博彩承批公司",
+                                          jsx.jsx("span", { className: "required-mark", children: "*" }),
+                                        ],
+                                      }),
+                                      jsx.jsxs("label", {
+                                        children: [
+                                          jsx.jsx("input", {
+                                            type: "radio",
+                                            name: "detail-scope",
+                                            checked: termsScopeMode === "全部",
+                                            onChange: () => setTermsScopeMode("全部"),
+                                          }),
+                                          " 全部",
+                                        ],
+                                      }),
+                                      jsx.jsxs("label", {
+                                        children: [
+                                          jsx.jsx("input", {
+                                            type: "radio",
+                                            name: "detail-scope",
+                                            checked: termsScopeMode === "指定承批公司",
+                                            onChange: () => setTermsScopeMode("指定承批公司"),
+                                          }),
+                                          " 禁入除外的承批公司（可複選）",
+                                        ],
+                                      }),
+                                    ],
+                                  }),
+                                  termsScopeMode === "指定承批公司" &&
+                                    jsx.jsx("div", {
+                                      className: "check-grid",
+                                      children: EXCLUSION_COMPANIES.map((option) =>
+                                        jsx.jsxs(
+                                          "label",
+                                          {
+                                            children: [
+                                              jsx.jsx("input", {
+                                                type: "checkbox",
+                                                checked: termsScopeCompanies.includes(option),
+                                                onChange: () =>
+                                                  setTermsScopeCompanies(
+                                                    termsScopeCompanies.includes(option)
+                                                      ? termsScopeCompanies.filter((item) => item !== option)
+                                                      : [...termsScopeCompanies, option],
+                                                  ),
+                                              }),
+                                              option,
+                                            ],
+                                          },
+                                          option,
+                                        ),
+                                      ),
+                                    }),
                                 ],
                               }),
                               jsx.jsxs("div", {

@@ -17,6 +17,14 @@ const statusColor = (status) =>
       : status.includes("待") || status === "部分成功"
         ? "amber"
         : "blue";
+const EXCLUSION_COMPANIES = [
+  "澳娛綜合度假股份有限公司",
+  "永利渡假村（澳門）股份有限公司",
+  "美高梅金殿超濠股份有限公司",
+  "新濠博亞（澳門）股份有限公司",
+  "銀河娛樂場股份有限公司",
+  "威尼斯人澳門股份有限公司",
+];
 /* ---- 狀態流程順序：未列入流程的狀態排在最後 ---- */
 const statusFlowRank = (status) => {
   const rank = WorkflowStatusOrder.indexOf(status);
