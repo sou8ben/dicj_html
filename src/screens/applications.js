@@ -5,31 +5,141 @@
  * ================================================================ */
 
 /* ---- 7.4 畫面 Screens：申請管理（列表與詳情）---- */
+function EscapeDocumentHtml(value) {
+  return String(value == null ? "" : value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+function BuildDocumentPageHtml(application, documentType, language = "中文") {
+  const isPortugueseStatement = documentType === "聲明書" && language === "葡文",
+    copy = isPortugueseStatement
+      ? {
+          title: "Declaração",
+          office: "Direcção de Inspecção e Coordenação de Jogos",
+          labels: ["N.º do processo", "Requerente", "Tipo de requerimento", "Origem", "Data do requerimento"],
+          description:
+            "Este documento é gerado automaticamente pelo sistema e prevalece a versão final aprovada. O documento inclui os dados do requerente, o objecto do requerimento, o parecer de aprovação e as instruções relacionadas.",
+          footer: "Pré-visualização · Sistema interno da DICJ",
+        }
+      : {
+          title: documentType,
+          office: "博彩監察協調局",
+          labels: ["案件編號", "申請人", "申請類型", "來源", "申請時間"],
+          description: "本文件由系統自動生成，內容以最終批核版本為準。文件內容包括申請人資料、申請事項、審批意見及相關批示。",
+          footer: "文件預覽 · DICJ 內部系統",
+        };
+  return `<section class="document-page"><header><h1>${EscapeDocumentHtml(copy.title)}</h1><div class="sub">${EscapeDocumentHtml(copy.office)}</div></header><table><tr><td>${EscapeDocumentHtml(copy.labels[0])}</td><td>${EscapeDocumentHtml(application.id)}</td></tr><tr><td>${EscapeDocumentHtml(copy.labels[1])}</td><td>${EscapeDocumentHtml(application.name)}</td></tr><tr><td>${EscapeDocumentHtml(copy.labels[2])}</td><td>${EscapeDocumentHtml(application.type)}</td></tr><tr><td>${EscapeDocumentHtml(copy.labels[3])}</td><td>${EscapeDocumentHtml(application.source)}</td></tr><tr><td>${EscapeDocumentHtml(copy.labels[4])}</td><td>${EscapeDocumentHtml(application.time)}</td></tr></table><p>${EscapeDocumentHtml(copy.description)}</p><footer>${EscapeDocumentHtml(copy.footer)}</footer></section>`;
+}
+function BuildDocumentHtml(title, pageHtml, language = "中文") {
+  const htmlLanguage = language === "葡文" ? "pt" : "zh-Hant";
+  return `<!DOCTYPE html><html lang="${htmlLanguage}"><head><meta charset="utf-8"><title>${EscapeDocumentHtml(title)}</title><style>body{margin:0;font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;color:#17324d;background:#eef3f6}.document-page{box-sizing:border-box;max-width:900px;min-height:1120px;margin:24px auto;padding:40px;background:#fff;box-shadow:0 2px 10px #17324d18}.document-page+.document-page{break-before:page;page-break-before:always}header{text-align:center;border-bottom:2px solid #123a63;padding-bottom:12px;margin-bottom:24px}h1{font-size:24px;color:#123a63;margin:0 0 4px}.sub{font-size:12px;color:#64748b}table{width:100%;border-collapse:collapse;margin:16px 0;font-size:14px}td{border:1px solid #cbd5e1;padding:8px 10px}td:first-child{width:160px;background:#f1f5f9}p{font-size:14px;line-height:1.8;color:#475569}footer{margin-top:48px;text-align:right;font-size:12px;color:#94a3b8}@media print{body{background:#fff}.document-page{max-width:none;min-height:0;margin:0;padding:40px;box-shadow:none}}</style></head><body>${pageHtml}</body></html>`;
+}
+function BuildCaseDocumentHtml(application, documentType, language = "中文") {
+  const title = documentType === "聲明書" && language === "葡文" ? "Declaração" : documentType,
+    htmlLanguage = documentType === "聲明書" && language === "葡文" ? "葡文" : "中文";
+  return BuildDocumentHtml(title, BuildDocumentPageHtml(application, documentType, language), htmlLanguage);
+}
+function BuildBatchCorrespondenceHtml(applications) {
+  return BuildDocumentHtml(
+    "批次公函",
+    applications.map((application) => BuildDocumentPageHtml(application, "公函")).join(""),
+  );
+}
+function BuildBatchCorrespondenceFilename() {
+  const now = new Date(),
+    pad = (value) => String(value).padStart(2, "0"),
+    timestamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
+  return `公函_批次_${timestamp}.html`;
+}
+function DownloadHtmlDocument(html, filename) {
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" }),
+    link = document.createElement("a");
+  ((link.href = URL.createObjectURL(blob)),
+    (link.download = filename),
+    link.click(),
+    URL.revokeObjectURL(link.href));
+}
+function PrintHtmlDocument(html) {
+  const frame = document.createElement("iframe");
+  ((frame.style.position = "absolute"),
+    (frame.style.width = "0"),
+    (frame.style.height = "0"),
+    (frame.style.border = "0"),
+    document.body.appendChild(frame));
+  const frameDocument = frame.contentDocument || frame.contentWindow.document;
+  (frameDocument.open(), frameDocument.write(html), frameDocument.close());
+  (frame.contentWindow.focus(), frame.contentWindow.print());
+  setTimeout(() => document.body.removeChild(frame), 1000);
+}
 function ApplicationsListScreen({ rows: rows, onOpen: onOpen }) {
   const [page, setPage] = React.useState(1),
     [pageSize, setPageSize] = React.useState(10),
     [filterCriteria, setFilterCriteria] = React.useState(null),
-    filteredRows = React.useMemo(() => filterApplicationRows(rows, filterCriteria), [rows, filterCriteria]);
+    [isSelectionMode, setIsSelectionMode] = React.useState(false),
+    [selectedIds, setSelectedIds] = React.useState([]),
+    [batchPreview, setBatchPreview] = React.useState(null),
+    [batchSigners, setBatchSigners] = React.useState({ director: false, actingDirector: false }),
+    filteredRows = React.useMemo(() => filterApplicationRows(rows, filterCriteria), [rows, filterCriteria]),
+    applicationsById = React.useMemo(() => new Map(rows.map((application) => [application.id, application])), [rows]),
+    selectedApplications = selectedIds
+      .map((id) => applicationsById.get(id))
+      .filter((application) => application && application.status === "完成"),
+    batchDocumentHtml = batchPreview ? BuildBatchCorrespondenceHtml(batchPreview) : "",
+    handleBatchCorrespondence = () => {
+      if (!isSelectionMode) {
+        setIsSelectionMode(true);
+        return;
+      }
+      if (selectedApplications.length === 0) return;
+      setBatchSigners({ director: false, actingDirector: false });
+      setBatchPreview(selectedApplications);
+    };
   return jsx.jsxs(jsx.Fragment, {
     children: [
-      jsx.jsx("div", {
-        className: "page-heading",
-        children: jsx.jsxs("div", {
+      jsx.jsx(PageHeader, {
+        title: "申請管理",
+        action: jsx.jsxs("div", {
+          className: "button-row",
           children: [
-            jsx.jsx("h1", { children: "申請管理" })
+            isSelectionMode &&
+              jsx.jsx(Button, {
+                variant: "ghost",
+                onClick: () => (setIsSelectionMode(false), setSelectedIds([])),
+                children: "取消選取",
+              }),
+            jsx.jsx(Button, {
+              icon: W8,
+              disabled: isSelectionMode && selectedApplications.length === 0,
+              onClick: handleBatchCorrespondence,
+              children: isSelectionMode ? `公函生成（${selectedApplications.length}）` : "公函生成",
+            }),
           ],
         }),
       }),
       jsx.jsxs("section", {
         className: "panel",
         children: [
-          jsx.jsx(SearchFilters, { onSearch: (criteria) => (setFilterCriteria(criteria), setPage(1)) }),
+          jsx.jsx(SearchFilters, {
+            onSearch: (criteria) =>
+              (setFilterCriteria(criteria),
+              setPage(1),
+              setIsSelectionMode(false),
+              setSelectedIds([]),
+              setBatchPreview(null)),
+          }),
           jsx.jsx(ApplicationsTable, {
             rows: filteredRows,
             onOpen: onOpen,
             actionLabel: "查看",
             page: page,
             pageSize: pageSize,
+            selectable: isSelectionMode,
+            selectedIds: selectedIds,
+            onSelectionChange: setSelectedIds,
+            isRowSelectable: (application) => application.status === "完成",
           }),
           jsx.jsx(Pager, {
             total: filteredRows.length,
@@ -40,6 +150,107 @@ function ApplicationsListScreen({ rows: rows, onOpen: onOpen }) {
           }),
         ],
       }),
+      batchPreview &&
+        jsx.jsx(Modal, {
+          title: "公函生成",
+          className: "batch-correspondence-modal",
+          onClose: () => setBatchPreview(null),
+          children: jsx.jsxs(jsx.Fragment, {
+            children: [
+              jsx.jsxs("div", {
+                className: "batch-correspondence-preview",
+                children: [
+                  jsx.jsx("div", {
+                    className: "batch-correspondence-icon",
+                    children: jsx.jsx(W8, { size: 30, weight: "duotone" }),
+                  }),
+                  jsx.jsxs("div", {
+                    children: [
+                      jsx.jsx("b", { children: "合併公函已準備生成" }),
+                    ],
+                  }),
+                ],
+              }),
+              jsx.jsx("div", {
+                className: "table-wrap batch-correspondence-table",
+                children: jsx.jsxs("table", {
+                  children: [
+                    jsx.jsx("thead", {
+                      children: jsx.jsxs("tr", {
+                        children: [
+                          jsx.jsx("th", { children: "申請編號" }),
+                          jsx.jsx("th", { children: "申請人" }),
+                          jsx.jsx("th", { children: "類型" }),
+                          jsx.jsx("th", { children: "來源" }),
+                        ],
+                      }),
+                    }),
+                    jsx.jsx("tbody", {
+                      children: batchPreview.map((application) =>
+                        jsx.jsxs(
+                          "tr",
+                          {
+                            children: [
+                              jsx.jsx("td", { className: "strong", children: application.id }),
+                              jsx.jsx("td", { children: application.name }),
+                              jsx.jsx("td", { children: application.type }),
+                              jsx.jsx("td", { children: application.source }),
+                            ],
+                          },
+                          application.id,
+                        ),
+                      ),
+                    }),
+                  ],
+                }),
+              }),
+              jsx.jsxs("div", {
+                className: "form-actions document-preview-actions",
+                children: [
+                  jsx.jsxs("div", {
+                    className: "document-signature-options",
+                    children: [
+                      jsx.jsx("span", { className: "document-signature-label", children: "簽署：" }),
+                      jsx.jsxs("label", {
+                        children: [
+                          jsx.jsx("input", {
+                            type: "checkbox",
+                            checked: batchSigners.director,
+                            onChange: (event) =>
+                              setBatchSigners({ ...batchSigners, director: event.target.checked }),
+                          }),
+                          "局長",
+                        ],
+                      }),
+                      jsx.jsxs("label", {
+                        children: [
+                          jsx.jsx("input", {
+                            type: "checkbox",
+                            checked: batchSigners.actingDirector,
+                            onChange: (event) =>
+                              setBatchSigners({ ...batchSigners, actingDirector: event.target.checked }),
+                          }),
+                          "代局長",
+                        ],
+                      }),
+                    ],
+                  }),
+                  jsx.jsx(Button, {
+                    variant: "outline",
+                    icon: Hd,
+                    onClick: () => PrintHtmlDocument(batchDocumentHtml),
+                    children: "打印",
+                  }),
+                  jsx.jsx(Button, {
+                    icon: bd,
+                    onClick: () => DownloadHtmlDocument(batchDocumentHtml, BuildBatchCorrespondenceFilename()),
+                    children: "下載",
+                  }),
+                ],
+              }),
+            ],
+          }),
+        }),
     ],
   });
 }
@@ -107,19 +318,30 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
     [termsScopeCompanies, setTermsScopeCompanies] = React.useState(() => BuildScopeEditorDetails(BuildTermsDetails(application).scope).companies),
     [confirmAction, setConfirmAction] = React.useState(null),
     [previewDoc, setPreviewDoc] = React.useState(null),
+    [documentLanguage, setDocumentLanguage] = React.useState("中文"),
+    supervisorAccounts = DemoAccounts.filter(
+      (account) => account.role === WorkflowRoles.SUPERVISOR && account.status === "啟用",
+    ),
     [actingSigners, setActingSigners] = React.useState({ deputyDivisionHead: false, deputyDepartmentHead: false }),
+    [reviewSignerChecked, setReviewSignerChecked] = React.useState(false),
+    [supervisorSelection, setSupervisorSelection] = React.useState(null),
+    [supervisorDraftId, setSupervisorDraftId] = React.useState(() => supervisorAccounts[0]?.id || ""),
     [attachments, setAttachments] = React.useState([
       { name: "身份證.pdf", time: "2026-07-05 13:59" },
       { name: "近照.jpg", time: "2026-07-05 13:59" },
     ]),
     attachmentsInputRef = React.useRef(null),
     [viewAttachment, setViewAttachment] = React.useState(null),
-    actions = getAvailableActions(application, role),
+    actions = getAvailableActions(application, role).filter(
+      (action) =>
+        !(application.source === "親臨" && ["counter_return_case", "counter_request_return"].includes(action.id)),
+    ),
     mainActions = actions.filter((item) => item.section === "main"),
     notificationActions = actions.filter((item) => item.section === "notification"),
     simulationActions = actions.filter((item) => item.section === "simulation"),
     // 文件清單與狀態由 utils.js 的 getCaseDocuments 決定；已簽署或已作廢的文件不可再選代任簽署
     caseDocuments = getCaseDocuments(application),
+    approvalAssignment = application.approvalAssignment || null,
     canChooseActingSigners = !isDocumentSignedStatus(application.status) && application.status !== "作廢",
     applicantDetails = BuildApplicantDetails(application),
     termsDetails = BuildTermsDetails(application),
@@ -187,46 +409,48 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
         setToast("期限、通知與聲明已更新"),
         setTimeout(() => setToast(""), 2600));
     },
-    runAction = (action) => {
+    runAction = (action, transitionOptions = {}) => {
       try {
-        const result = onTransition(action.id, note);
+        const result = onTransition(action.id, note, transitionOptions);
         (setToast(result.message), setNote(""), setTimeout(() => setToast(""), 2600));
+        return true;
       } catch (result) {
         (setToast(result.message || "操作未能完成"), setTimeout(() => setToast(""), 2600));
+        return false;
       }
     },
+    openSupervisorSelection = (action) => {
+      const firstSupervisor = supervisorAccounts[0];
+      if (!firstSupervisor) {
+        setToast("目前沒有可選擇的啟用主管");
+        setTimeout(() => setToast(""), 2600);
+        return;
+      }
+      (setReviewSignerChecked(true), setSupervisorDraftId(firstSupervisor.id), setSupervisorSelection(action));
+    },
+    cancelSupervisorSelection = () => (setReviewSignerChecked(false), setSupervisorSelection(null)),
+    confirmSupervisorSelection = () => {
+      const selectedSupervisor = supervisorAccounts.find((account) => account.id === supervisorDraftId);
+      if (!selectedSupervisor || !supervisorSelection) return;
+      const completed = runAction(supervisorSelection, {
+        approvalAssignment: {
+          signer: "代廳長",
+          supervisorId: selectedSupervisor.id,
+          supervisorName: selectedSupervisor.name,
+        },
+      });
+      completed && setSupervisorSelection(null);
+    },
     history = application.history || [],
-    buildDocumentHtml = (docType) =>
-      `<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="utf-8"><title>${docType}</title><style>body{font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;color:#17324d;padding:40px}header{text-align:center;border-bottom:2px solid #123a63;padding-bottom:12px;margin-bottom:24px}h1{font-size:24px;color:#123a63;margin:0 0 4px}.sub{font-size:12px;color:#64748b}table{width:100%;border-collapse:collapse;margin:16px 0;font-size:14px}td{border:1px solid #cbd5e1;padding:8px 10px}td:first-child{width:160px;background:#f1f5f9}p{font-size:14px;line-height:1.8;color:#475569}footer{margin-top:48px;text-align:right;font-size:12px;color:#94a3b8}</style></head><body><header><h1>${docType}</h1><div class="sub">博彩監察協調局</div></header><table><tr><td>案件編號</td><td>${application.id}</td></tr><tr><td>申請人</td><td>${application.name}</td></tr><tr><td>申請類型</td><td>${application.type}</td></tr><tr><td>來源</td><td>${application.source}</td></tr><tr><td>申請時間</td><td>${application.time}</td></tr></table><p>本文件由系統自動生成，內容以最終批核版本為準。文件內容包括申請人資料、申請事項、審批意見及相關批示。</p><footer>文件預覽 · DICJ 內部系統</footer></body></html>`,
-    buildPdfPlaceholder = (docType) =>
+    buildPdfPlaceholder = (docType, language = "中文") =>
       jsx.jsxs("div", {
         className: "pdf-placeholder",
         children: [
           jsx.jsx("div", { className: "pdf-badge", children: "PDF" }),
-          jsx.jsx("b", { children: docType }),
+          jsx.jsx("b", { children: docType === "聲明書" ? `${docType}（${language}）` : docType }),
           jsx.jsx("small", { children: "模擬文件預覽 · 博彩監察協調局" }),
         ],
       }),
-    downloadDocument = (docType) => {
-      const blob = new Blob([buildDocumentHtml(docType)], { type: "text/html" }),
-        link = document.createElement("a");
-      ((link.href = URL.createObjectURL(blob)),
-        (link.download = `${docType}_${application.id.replace(/\//g, "-")}.html`),
-        link.click(),
-        URL.revokeObjectURL(link.href));
-    },
-    printDocument = (docType) => {
-      const frame = document.createElement("iframe");
-      ((frame.style.position = "absolute"),
-        (frame.style.width = "0"),
-        (frame.style.height = "0"),
-        (frame.style.border = "0"),
-        document.body.appendChild(frame));
-      const frameDoc = frame.contentDocument || frame.contentWindow.document;
-      (frameDoc.open(), frameDoc.write(buildDocumentHtml(docType)), frameDoc.close());
-      (frame.contentWindow.focus(), frame.contentWindow.print());
-      setTimeout(() => document.body.removeChild(frame), 1000);
-    },
     handleAttachmentsUpload = (event) => {
       const files = Array.from(event.target.files || []),
         now = new Date(),
@@ -824,10 +1048,37 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
                           }),
                           mainActions.length > 0
                             ? jsx.jsx("div", {
-                                className: "form-actions",
+                                className: "form-actions approval-actions",
                                 children: jsx.jsx("div", {
                                   className: "button-row",
-                                  children: mainActions.map((item) =>
+                                  children: mainActions.flatMap((item) => [
+                                    ["complete_review", "counter_complete_review"].includes(item.id) &&
+                                      jsx.jsxs(
+                                        "div",
+                                        {
+                                          className: "document-signature-options",
+                                          children: [
+                                            jsx.jsx("span", {
+                                              className: "document-signature-label",
+                                              children: "代任簽署：",
+                                            }),
+                                            jsx.jsxs("label", {
+                                              children: [
+                                                jsx.jsx("input", {
+                                                  type: "checkbox",
+                                                  checked: reviewSignerChecked,
+                                                  onChange: (event) =>
+                                                    event.target.checked
+                                                      ? openSupervisorSelection(item)
+                                                      : cancelSupervisorSelection(),
+                                                }),
+                                                "代廳長",
+                                              ],
+                                            }),
+                                          ],
+                                        },
+                                        `${item.id}-signer`,
+                                      ),
                                     jsx.jsx(
                                       Button,
                                       {
@@ -837,7 +1088,21 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
                                       },
                                       item.id,
                                     ),
-                                  ),
+                                    ["approve_sign", "counter_approve_sign"].includes(item.id) &&
+                                      approvalAssignment &&
+                                      approvalAssignment.signer === "代廳長" &&
+                                      jsx.jsx(
+                                        "div",
+                                        {
+                                          className: "document-signature-options",
+                                          children: jsx.jsx("span", {
+                                            className: "document-signature-label",
+                                            children: "由代廳長簽署",
+                                          }),
+                                        },
+                                        `${item.id}-assigned-signer`,
+                                      ),
+                                  ]),
                                 }),
                               })
                             : jsx.jsx("div", {
@@ -902,7 +1167,7 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
                   jsx.jsx("h2", { children: "列印文件" }),
                   caseDocuments.length === 0 &&
                     jsx.jsx("div", { className: "readonly-note", children: "案件已作廢，不提供列印文件。" }),
-                  caseDocuments.map((caseDocument) =>
+                  caseDocuments.filter((caseDocument) => caseDocument.name !== "公函").map((caseDocument) =>
                     jsx.jsxs(
                       "div",
                       {
@@ -919,6 +1184,7 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
                             icon: Na,
                             onClick: () => {
                               (setActingSigners({ deputyDivisionHead: false, deputyDepartmentHead: false }),
+                                setDocumentLanguage("中文"),
                                 setPreviewDoc(caseDocument.name));
                             },
                             children: "預覽",
@@ -1007,31 +1273,92 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
             ],
           }),
         }),
+      supervisorSelection &&
+        jsx.jsx(Modal, {
+          title: "選擇審批主管",
+          className: "approval-supervisor-modal",
+          onClose: cancelSupervisorSelection,
+          children: jsx.jsxs(jsx.Fragment, {
+            children: [
+              jsx.jsx("p", {
+                className: "readonly-note",
+                children: "已選擇代廳長簽署，請選擇負責此案件的主管後上呈審批。",
+              }),
+              jsx.jsx(Field, {
+                label: "審批主管",
+                children: jsx.jsxs(Select, {
+                  value: supervisorDraftId,
+                  onChange: (event) => setSupervisorDraftId(event.target.value),
+                  children: supervisorAccounts.map((account) =>
+                    jsx.jsx(
+                      "option",
+                      { value: account.id, children: `${account.name}（${account.role}）` },
+                      account.id,
+                    ),
+                  ),
+                }),
+              }),
+              jsx.jsxs("div", {
+                className: "form-actions",
+                children: [
+                  jsx.jsx(Button, {
+                    variant: "ghost",
+                    onClick: cancelSupervisorSelection,
+                    children: "取消",
+                  }),
+                  jsx.jsx(Button, {
+                    onClick: confirmSupervisorSelection,
+                    children: "確認並上呈審批",
+                  }),
+                ],
+              }),
+            ],
+          }),
+        }),
       previewDoc &&
         jsx.jsx(Modal, {
           title: `預覽 ${previewDoc}`,
           onClose: () => setPreviewDoc(null),
           children: [
-            buildPdfPlaceholder(previewDoc),
+            buildPdfPlaceholder(previewDoc, previewDoc === "聲明書" ? documentLanguage : "中文"),
             jsx.jsxs("div", {
               className: "form-actions document-preview-actions",
               children: [
+                previewDoc === "聲明書" &&
+                  jsx.jsxs("div", {
+                    className: "document-language-options",
+                    children: [
+                      jsx.jsx("span", { className: "document-signature-label", children: "語言：" }),
+                      jsx.jsx(Button, {
+                        variant: documentLanguage === "中文" ? "primary" : "outline",
+                        onClick: () => setDocumentLanguage("中文"),
+                        children: "中文",
+                      }),
+                      jsx.jsx(Button, {
+                        variant: documentLanguage === "葡文" ? "primary" : "outline",
+                        onClick: () => setDocumentLanguage("葡文"),
+                        children: "葡文",
+                      }),
+                    ],
+                  }),
                 canChooseActingSigners &&
+                  previewDoc !== "聲明書" &&
                   jsx.jsxs("div", {
                     className: "document-signature-options",
                     children: [
                       jsx.jsx("span", { className: "document-signature-label", children: "代任簽署：" }),
-                      jsx.jsxs("label", {
-                        children: [
-                          jsx.jsx("input", {
-                            type: "checkbox",
-                            checked: actingSigners.deputyDivisionHead,
-                            onChange: (event) =>
-                              setActingSigners({ ...actingSigners, deputyDivisionHead: event.target.checked }),
-                          }),
-                          "代處長",
-                        ],
-                      }),
+                      previewDoc === "申請表" &&
+                        jsx.jsxs("label", {
+                          children: [
+                            jsx.jsx("input", {
+                              type: "checkbox",
+                              checked: actingSigners.deputyDivisionHead,
+                              onChange: (event) =>
+                                setActingSigners({ ...actingSigners, deputyDivisionHead: event.target.checked }),
+                            }),
+                            "代處長",
+                          ],
+                        }),
                       jsx.jsxs("label", {
                         children: [
                           jsx.jsx("input", {
@@ -1048,12 +1375,16 @@ function ApplicationDetailScreen({ application: application, onBack: onBack, onT
                 jsx.jsx(Button, {
                   variant: "outline",
                   icon: Hd,
-                  onClick: () => printDocument(previewDoc),
+                  onClick: () => PrintHtmlDocument(BuildCaseDocumentHtml(application, previewDoc, documentLanguage)),
                   children: "打印",
                 }),
                 jsx.jsx(Button, {
                   icon: bd,
-                  onClick: () => downloadDocument(previewDoc),
+                  onClick: () =>
+                    DownloadHtmlDocument(
+                      BuildCaseDocumentHtml(application, previewDoc, documentLanguage),
+                      `${previewDoc}${previewDoc === "聲明書" ? `_${documentLanguage}` : ""}_${application.id.replace(/\//g, "-")}.html`,
+                    ),
                   children: "下載",
                 }),
               ],

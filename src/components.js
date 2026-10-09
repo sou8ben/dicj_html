@@ -424,8 +424,19 @@ function SearchFilters({ showParty: showParty = true, onSearch: onSearch }) {
     ],
   });
 }
-function ApplicationsTable({ rows: rows, onOpen: onOpen, actionLabel: actionLabel = "查看", page: page = 1, pageSize: pageSize = 10 }) {
+function ApplicationsTable({
+  rows: rows,
+  onOpen: onOpen,
+  actionLabel: actionLabel = "查看",
+  page: page = 1,
+  pageSize: pageSize = 10,
+  selectable: selectable = false,
+  selectedIds: selectedIds = [],
+  onSelectionChange: onSelectionChange,
+  isRowSelectable: isRowSelectable = () => true,
+}) {
   const [sort, setSort] = React.useState({ key: null, direction: "asc" }),
+    selectAllRef = React.useRef(null),
     onSort = (nextSort) => setSort(nextSort),
     sortedRows = React.useMemo(
       () =>
@@ -443,7 +454,32 @@ function ApplicationsTable({ rows: rows, onOpen: onOpen, actionLabel: actionLabe
     ),
     totalPages = Math.max(1, Math.ceil(sortedRows.length / pageSize)),
     currentPage = Math.min(Math.max(1, page), totalPages),
-    pagedRows = sortedRows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+    pagedRows = sortedRows.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    selectedIdSet = new Set(selectedIds),
+    selectablePageRows = selectable ? pagedRows.filter(isRowSelectable) : [],
+    selectablePageIds = selectablePageRows.map((row) => row.id),
+    selectedPageCount = selectablePageIds.filter((id) => selectedIdSet.has(id)).length,
+    allPageSelected = selectablePageIds.length > 0 && selectedPageCount === selectablePageIds.length,
+    somePageSelected = selectedPageCount > 0 && !allPageSelected,
+    toggleRowSelection = (row) => {
+      if (!selectable || !isRowSelectable(row) || !onSelectionChange) return;
+      onSelectionChange(
+        selectedIdSet.has(row.id)
+          ? selectedIds.filter((id) => id !== row.id)
+          : [...selectedIds, row.id],
+      );
+    },
+    togglePageSelection = () => {
+      if (!onSelectionChange || selectablePageIds.length === 0) return;
+      onSelectionChange(
+        allPageSelected
+          ? selectedIds.filter((id) => !selectablePageIds.includes(id))
+          : [...selectedIds, ...selectablePageIds.filter((id) => !selectedIdSet.has(id))],
+      );
+    };
+  React.useEffect(() => {
+    if (selectAllRef.current) selectAllRef.current.indeterminate = somePageSelected;
+  }, [somePageSelected, allPageSelected, currentPage, pageSize]);
   return jsx.jsx("div", {
     className: "table-wrap",
     children: jsx.jsxs("table", {
@@ -451,6 +487,18 @@ function ApplicationsTable({ rows: rows, onOpen: onOpen, actionLabel: actionLabe
         jsx.jsx("thead", {
           children: jsx.jsxs("tr", {
             children: [
+              selectable &&
+                jsx.jsx("th", {
+                  className: "application-select-column",
+                  children: jsx.jsx("input", {
+                    ref: selectAllRef,
+                    type: "checkbox",
+                    checked: allPageSelected,
+                    disabled: selectablePageIds.length === 0,
+                    "aria-label": "選取目前頁面的完成案件",
+                    onChange: togglePageSelection,
+                  }),
+                }),
               jsx.jsx(SortableTh, { label: "申請編號", sortKey: "id", sort: sort, onSort: onSort }),
               jsx.jsx(SortableTh, { label: "申請人", sortKey: "name", sort: sort, onSort: onSort }),
               jsx.jsx(SortableTh, { label: "類型", sortKey: "type", sort: sort, onSort: onSort }),
@@ -470,6 +518,17 @@ function ApplicationsTable({ rows: rows, onOpen: onOpen, actionLabel: actionLabe
                 "tr",
                 {
                   children: [
+                    selectable &&
+                      jsx.jsx("td", {
+                        className: "application-select-column",
+                        children: jsx.jsx("input", {
+                          type: "checkbox",
+                          checked: selectedIdSet.has(row.id),
+                          disabled: !isRowSelectable(row),
+                          "aria-label": `選取案件 ${row.id}`,
+                          onChange: () => toggleRowSelection(row),
+                        }),
+                      }),
                     jsx.jsx("td", { className: "strong", children: row.id }),
                     jsx.jsxs("td", {
                       className: "cell-name",
@@ -500,7 +559,7 @@ function ApplicationsTable({ rows: rows, onOpen: onOpen, actionLabel: actionLabe
                 row.id,
               ),
             ),
-            rows.length === 0 && jsx.jsx(TableEmptyState, { cols: 9 }),
+            rows.length === 0 && jsx.jsx(TableEmptyState, { cols: selectable ? 10 : 9 }),
           ],
         }),
       ],

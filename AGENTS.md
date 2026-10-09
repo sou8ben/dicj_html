@@ -14,6 +14,7 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 
 - Keep the One Account initial-document supplement loop separate from later review returns: confirming missing documents (`confirm_missing`) sends the supplement notice automatically and moves the case straight to `已通知補件` (no separate visible `待通知補件` status or manual `send_supplement_notice` step), then, when the applicant supplements on 一戶通, the system auto-confirms receipt and moves `已通知補件 → 待處理` with no counter action (demo: the `simulate_applicant_supplement` simulation button, recorded in history as 申請人「於一戶通補交資料」 plus 系統「自動確認收到補交資料」; simulation actions may set `historyActor`/`historyLabel` to record the real external actor); processor/supervisor returns use `退回 → 待複核` after corrected documents are confirmed.
 - 親臨流程以可見狀態直接區分角色：`待複核` 由處理人員複核，完成後轉為 `待審批` 由主管審批；不得再以 `stage` 將處理人員複核藏在 `待審批` 內。退回補正後回到 `待複核` 重新複核。
+- 來源為親臨的案件詳情不顯示「退回案件／退回」操作按鈕；其他來源及流程狀態規則維持不變。
 - 親臨（臨櫃）主線為 `暫存 → 待複核 → 待審批 → 已審批 → 完成`；`暫存` 由櫃枱人員執行「提交申請」後轉為 `待複核`。流程說明中的此列由 workflow 的 `submit_counter_application` 操作推導，不手寫下一狀態。
 - RecordCheck 核查禁入紀錄時以「證件類型:證件號碼」為鍵查詢 `DemoData.exclusionHistory`（demo 紀錄均為澳門居民身份證），兩者須同時相符；介面顯示「證件類型：…　證件號碼：…」。續期判定（到期前 30 天內）以本機時間為準，demo 13888888 的到期日為本機日期 + 20 天。
 - 公眾假期資料以「名稱+日期」去重、依日期排序；跨日假期日期存為「開始日 至 結束日」，編輯時僅改開始日（改到 ≥ 結束日則收斂為單日），儲存需有日期且不可與其他列重複。
@@ -26,8 +27,9 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 - 一戶通案件審批通過後不停留在「已審批」：主管「審批通過並雲簽」時，`transition` 經 `getAutoAdvance` 依 `termsDetails.pickupMethod`（`getPickupMethod`，舊資料「電子方式」視為電子通知、其餘視為親臨）自動轉入下一步，歷程另記一筆 `actorRole: "系統"`（「自動送交制件」或「自動發送電子通知」），保留「待審批 → 已審批 → …」節點。一戶通沒有「完成案件處理」「送交制件」「發送電子通知」手動操作。分支：智取易 已審批 → 等待制件 → 已制件 → 已送出 → 送達待取件 → 已通知取件 → 已取件 → 完成；親臨 已審批 → 等待制件 → 已制件 → 已通知取件 → 已取件 → 完成；電子通知 已審批 → 已發送電子通知 → 待查閱 → 已查閱 → 完成。終止狀態沿用「完成」，不另設「已完成」。取件各步均由櫃枱人員操作。親臨（臨櫃）案件的已審批為：處理人員「完成案件處理」→ 櫃枱「記錄領取及簽收」→ 完成。
 - 智取易送達、申請人於智取易取件、電子通知送達、申請人查閱屬外部系統事件，以 `section: "simulation"` 的「模擬…」操作呈現，案件詳情放在右側虛線外框的「外部事件模擬」面板，與正式操作區分。取件方式選項為智取易、親臨、電子通知（`PICKUP_METHODS`），不再提供郵寄。
 - 一戶通案件不提供作廢（業務設計，非遺漏）；「作廢案件」只適用於親臨案件。
-- 系統不設列印步驟或「已列印」狀態（已移除 `counter_print_documents` 與 `documentsPrinted`）。文件是否已簽署只以案件狀態判定（已審批及其後各步，作廢除外），文件列顯示「已建立／未簽署／已簽署」；已簽署或作廢案件的文件預覽不顯示「代任簽署」選項；預覽視窗的「打印」「下載」只輸出文件，不改變案件狀態。
-- 案件詳情「列印文件」清單：一戶通案件為申請表、聲明書、公函、通知書、批示；親臨案件只有公函、通知書、批示（無申請表、聲明書）；作廢案件不列任何文件，只顯示「案件已作廢，不提供列印文件。」。審批前申請表／聲明書顯示「已建立」、其餘「未簽署」，審批後一律「已簽署」。 清單與狀態只在 `utils.js` 的 `getCaseDocuments` 定義，案件詳情與文件生成說明共用。
+- 系統不設列印步驟或「已列印」狀態（已移除 `counter_print_documents` 與 `documentsPrinted`）。文件是否已簽署只以案件狀態判定（已審批及其後各步，作廢除外），文件列顯示「已建立／未簽署／已簽署」；已簽署或作廢案件的文件預覽不顯示「代任簽署」選項；未簽署時申請表預覽可選「代處長」「代廳長」，通知書、批示預覽只保留「代廳長」，聲明書預覽不顯示 `document-signature-options`，改提供中文／葡文切換；「代廳長」亦在「審批通過並雲簽」按鈕左側提供；預覽視窗的「打印」「下載」只輸出文件，不改變案件狀態。
+- 案件詳情「列印文件」清單：一戶通案件顯示申請表、聲明書、通知書、批示；親臨案件顯示通知書、批示（均不在案件詳情 panel 顯示公函）；作廢案件不列任何文件，只顯示「案件已作廢，不提供列印文件。」。審批前申請表／聲明書顯示「已建立」、其餘「未簽署」，審批後一律「已簽署」。文件清單與狀態仍由 `utils.js` 的 `getCaseDocuments` 統一提供，文件生成說明保留公函欄位。
+- 申請管理提供批次公函生成：先點擊「公函生成」進入選取模式才顯示 checkbox；所有可進入申請管理的角色均可勾選任何類型、來源且狀態為「完成」的案件；表頭只全選目前頁面的完成案件，選取在排序、翻頁及更改每頁筆數時保留，重新查詢時清除。生成結果為單一可打印／下載的 HTML，每宗案件獨立一頁；生成彈窗提供「局長」「代局長」兩個簽署 checkbox，每次開啟時重設且目前不保存。生成、打印及下載均不改案件狀態或操作紀錄。
 - 作廢及退回案件的「案件流程」停在轉入前所在步驟（取歷程中最後一筆 `toStatus` 為目前狀態的 `fromStatus`）；無歷程時一戶通及親臨退回均預設標在「待複核」。退回以琥珀色（`.process-progress.returned`）標示，作廢維持紅色。「補件處理」一格只表示首次補件循環。
 - 「已審批」的負責角色（只適用親臨案件，一戶通不停留在已審批）：未完成案件處理為處理人員，完成後為櫃枱人員。一戶通審批後的取件各步由櫃枱人員負責。
 - 工作台超時統計以系統日期計算；臨櫃新建案件的申請時間為實際建立時間（`formatNow()`）。
@@ -75,3 +77,5 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 - `FrontendInfoModal` has `min-width: 900px` (`.modal.frontend-info-modal` in `src/design-system.css`, applied through the shared `Modal`'s `className` prop); other modals keep the default `min(720px, 90vw)` width.
 - Flow-exit confirmations inside the app use the shared `Modal`, with 「確認離開」 on the left and 「繼續填寫」 on the right. Do not use `window.confirm`; browser reload/tab-close protection uses the native beforeunload prompt because custom modals cannot block browser unload.
 - Read-only summary lists for 「申請禁入之博彩承批公司」 and 「知悉禁入申請服務途徑」 keep each item together with its following `、` as a non-breaking inline unit; allow wrapping only between complete items and fill the current line before wrapping.
+- 審批操作區的簽署資訊與主要按鈕成組靠右排列：複核送審階段「代廳長」`document-signature-options` 位於送審按鈕左方；待審批階段「由代廳長簽署」位於「審批通過並雲簽」按鈕右方。
+- 「完成複核並上呈主管審批／完成複核並送主管」左方提供靠右的「代廳長」簽署選項；勾選後必須於彈窗選擇啟用主管，確認後才轉入 `待審批`，並在審批操作區按鈕右方顯示「由代廳長簽署」。

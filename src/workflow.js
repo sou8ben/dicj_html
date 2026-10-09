@@ -456,6 +456,12 @@
     const next = applyAction(application, actionId);
     const note = options && options.note ? String(options.note).trim() : "";
     const time = (options && options.time) || nowString();
+    if (["complete_review", "counter_complete_review"].includes(actionId)) {
+      next.approvalAssignment = options && options.approvalAssignment ? { ...options.approvalAssignment } : null;
+    }
+    if (["return_case", "request_return", "counter_return_case", "counter_request_return"].includes(actionId)) {
+      next.approvalAssignment = null;
+    }
     // 模擬外部事件可指定歷程的實際行為人（如申請人），不記為按下演示按鈕的角色
     next.history.push({
       actorRole: availableAction.historyActor || role,

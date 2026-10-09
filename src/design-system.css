@@ -629,6 +629,22 @@ input.input-error:focus {
   border-radius: 9px;
 }
 
+.application-select-column {
+  width: 46px;
+  min-width: 46px;
+  padding-right: 10px;
+  padding-left: 10px;
+  text-align: center;
+}
+
+.application-select-column input {
+  margin: 0 auto;
+}
+
+tr:hover td.application-select-column {
+  text-align: center;
+}
+
 table {
   min-width: 1000px;
   font-size: 14px;
@@ -1200,6 +1216,70 @@ input[type="radio"]:focus-visible {
   min-width: 900px;
 }
 
+.modal.batch-correspondence-modal {
+  width: min(820px, 92vw);
+}
+
+.batch-correspondence-preview {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--border-default);
+  border-radius: 9px;
+  background: var(--brand-050);
+}
+
+.batch-correspondence-icon {
+  display: grid;
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--brand-700);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-card);
+}
+
+.batch-correspondence-preview b {
+  color: var(--text-primary);
+  font-size: 15px;
+}
+
+.batch-correspondence-preview p {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.batch-correspondence-table {
+  margin-top: 18px;
+}
+
+.batch-correspondence-table table {
+  min-width: 620px;
+}
+
+.batch-correspondence-table th:last-child,
+.batch-correspondence-table td:last-child {
+  position: static;
+  width: auto;
+  white-space: normal;
+  text-align: left;
+  background: transparent;
+  box-shadow: none;
+}
+
+.batch-correspondence-table th:last-child {
+  background: #eef3f6;
+}
+
+.batch-correspondence-table tr:hover td:last-child {
+  text-align: left;
+  background: #f7fafc;
+}
+
 .frontend-changelog {
   display: grid;
   gap: 20px;
@@ -1457,6 +1537,18 @@ input[type="radio"]:focus-visible {
   order: 2;
 }
 
+.document-language-options {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  order: 0;
+  margin-top: 0;
+}
+
+.document-language-options .btn {
+  min-width: 72px;
+}
+
 .document-signature-options {
   display: flex;
   align-items: center;
@@ -1464,6 +1556,10 @@ input[type="radio"]:focus-visible {
   flex-wrap: wrap;
   color: var(--text-secondary);
   font-size: 14px;
+}
+
+.approval-actions .document-signature-options {
+  order: 2;
 }
 
 .document-signature-label {

@@ -28,12 +28,26 @@ const NAV_ITEMS = [
   { label: "帳號管理", id: "accounts", icon: Nd },
   { label: "操作日誌", id: "logs", icon: W8 },
 ];
-const APP_VERSION = "2026.10.08 05:50PM";
+const APP_VERSION = "2026.10.09 15:30PM";
 const FRONTEND_CHANGELOG = [
+  {
+    title: "2026.10.09 更新內容",
+    items: [
+      "案件詳情的「列印文件」panel 移除公函 document-row；公函生成及文件生成說明維持不變。",
+      "聲明書文件預覽移除 document-signature-options，新增中文／葡文切換，打印及下載按所選語言輸出；通知書、批示維持「代廳長」選項。",
+      "聲明書、通知書、批示的文件預覽代任簽署選項調整為「代廳長」",
+      "來源為親臨的案件詳情移除「退回案件／退回」操作按鈕。",
+      "調整審批操作區，讓複核送審的「代廳長」核取項位於按鈕左方並與按鈕靠右排列，待審批的「由代廳長簽署」文字位於審批按鈕右方。",
+      "完成複核上呈主管時可勾選代廳長並選擇主管；進入待審批後顯示「由代廳長簽署」。",
+    ],
+  },
   {
     title: "2026.10.08 更新內容",
     items: [
-      "一戶通來源且符合可編輯條件的案件詳情，恢復「申請人資料」及「期限、通知與聲明」兩個「編輯」按鈕；親臨案件維持不顯示。",,
+      "一戶通來源且符合可編輯條件的案件詳情，恢復「申請人資料」及「期限、通知與聲明」兩個「編輯」按鈕；親臨案件維持不顯示。",
+      "申請管理新增批次公函生成：可跨頁勾選完成案件，在預覽確認後打印或下載每案一頁的合併 HTML 公函。",
+      "批次公函生成彈窗新增「局長」及「代局長」簽署核取選項。",
+      "批次公函生成改為先點擊按鈕進入選取模式，勾選完成案件後再次點擊才開啟生成彈窗。",
     ],
   },
   {
@@ -426,7 +440,7 @@ const DOCUMENT_GUIDE_ORIGINS = [
 ];
 const DOCUMENT_GUIDE_OUTPUT_RULES = [
   "每份文件均可「預覽」，不限案件狀態及角色。",
-  "代任簽署：文件未簽署（審批前）時，預覽視窗可勾選「代處長」「代廳長」；已簽署或作廢案件不顯示。每次開啟預覽會重設，勾選結果目前不寫入文件、不保存（演示）。",
+  "代任簽署：文件未簽署（審批前）時，申請表預覽可勾選「代處長」「代廳長」，通知書、批示預覽只可勾選「代廳長」；聲明書預覽不顯示 document-signature-options，改提供中文／葡文切換。上述簽署選項已簽署或作廢案件不顯示，勾選結果目前不寫入文件、不保存（演示）。",
   "打印：開啟瀏覽器列印對話框；下載：存為「{文件名}_{案件編號}.html」。文件內容包括文件名稱、案件編號、申請人、申請類型、來源及申請時間。",
   "打印及下載只輸出文件，不改變案件狀態、不寫入操作紀錄；流程不設列印步驟，亦沒有「已列印」狀態。",
 ];
@@ -906,9 +920,9 @@ function App() {
         setToast(`申請 ${caseId} 已建立，申請表已準備列印`),
         setTimeout(() => setToast(""), 3e3));
     },
-    handleTransition = (action, note) => {
+    handleTransition = (action, note, transitionOptions = {}) => {
       if (!currentApplication) throw new Error("找不到目前案件");
-      const result = transitionApplication(currentApplication, action, role, { note: note });
+      const result = transitionApplication(currentApplication, action, role, { ...transitionOptions, note: note });
       return (
         setApplications((list) => list.map((app) => (app.id === currentApplication.id ? result.application : app))),
         setCurrentApplication(result.application),
